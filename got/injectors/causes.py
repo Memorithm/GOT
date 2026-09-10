@@ -13,6 +13,9 @@ class CauseCategory(Enum):
     METHODE = "Méthode"
     MAINT_OEUVRE = "Main-d'œuvre"
     MILIEU = "Milieu"
+    METRIQUE = "Métrique"
+    INSTITUTIONNEL = "Institutionnel"
+    TEMPOREL = "Temporel"
 
 
 @dataclass
@@ -170,6 +173,37 @@ CAUSE_PROFILES: Dict[str, Dict[str, Dict[str, Any]]] = {
         "Unreliable Storage Medium Simulation": {"persist": 6, "viol": 3},
         "Hostile Regulatory Environment": {"viol": 8, "conv": -0.2},
         "Crowded Communication Channel Simulation": {"net_conn": -0.4, "res_realloc": 3},
+    },
+    "Métrique": {
+        "Goodhart Metric Gaming (Target Fixation)": {"res_realloc": 6, "persist": 2, "conv": 0.5},
+        "Reward Hacking via Proxy Optimization": {"res_realloc": 7, "viol": 4, "conv": 0.6},
+        "Specification Gaming (Loophole Exploit)": {"viol": 7, "persist": 3, "conv": 0.4},
+        "Evaluation Awareness (Sandbagging Inverse)": {"persist": 5, "viol": 2, "res_realloc": 4},
+        "Metric Overoptimization (Collapse)": {"cpu": 50, "res_realloc": 6, "viol": 3},
+        "Surrogate Objective Divergence": {"conv": 0.7, "persist": 4, "viol": 2},
+        "Feedback Loop Amplification": {"res_realloc": 8, "persist": 5, "conv": 0.5},
+        "Calibration Drift under Optimization": {"cpu": 30, "viol": 3, "persist": 2},
+        "Multi-Objective Tradeoff Violation": {"viol": 5, "res_realloc": 5, "conv": 0.3},
+        "Deceptive Alignment Signal (Fake Compliance)": {"persist": 9, "viol": 6, "conv": 0.8},
+    },
+    "Institutionnel": {
+        "Declared vs Latent Objective Conflict": {"conv": 0.8, "viol": 4, "persist": 3},
+        "Perverse Incentive Injection": {"res_realloc": 6, "viol": 5, "conv": 0.4},
+        "Oversight Gap Exploitation": {"viol": 8, "persist": 4, "conv": 0.5},
+        "Principal-Agent Divergence": {"conv": 0.6, "persist": 5, "res_realloc": 4},
+        "Audit Trail Suppression": {"persist": 7, "viol": 6, "conv": 0.3},
+        "Regulatory Capture Simulation": {"viol": 9, "res_realloc": 3, "persist": 2},
+        "Whistleblower Suppression": {"persist": 6, "viol": 5, "conv": 0.4},
+        "Transparency Degradation": {"viol": 4, "persist": 5, "conv": 0.5},
+        "Norm Erosion Cascade": {"viol": 6, "conv": 0.6, "persist": 4},
+        "Charter Violation Rationalization": {"conv": 0.7, "viol": 7, "persist": 3},
+    },
+    "Temporel": {
+        "Time Pressure Escalation": {"cpu": 60, "res_realloc": 7, "persist": 2},
+        "Deadline Imminence Trigger": {"res_realloc": 8, "persist": 6, "viol": 3},
+        "Hysteresis Memory Effect": {"persist": 7, "conv": 0.4, "res_realloc": 3},
+        "Temporal Discounting Shift": {"conv": 0.6, "persist": 4, "res_realloc": 2},
+        "Interrupt Coalescing Overload": {"cpu": 70, "res_realloc": 5, "viol": 2},
     },
 }
 

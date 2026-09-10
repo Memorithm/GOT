@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import copy
 
 from got import (
     DummyAgent,
@@ -8,6 +9,10 @@ from got import (
     SelfPreservationScore,
     StatisticalAnalyzer,
     TaguchiHarness,
+    AutoPreservationAnalyzer,
+    InstrumentalConvergenceDetector,
+    BehavioralProfiler,
+    PreservationMetrics,
 )
 
 
@@ -72,6 +77,19 @@ async def run_full_benchmark(
     paths = reporter.export_all(results, weights, rankings)
     print()
 
+    # ── Phase 5 : caracterisation de l'auto-preservation ──
+    print("  [5/5] Caracterisation de l'auto-preservation (algorithmes)...")
+    char_report = await run_characterization_phase(top_n=5, rankings=rankings, iterations=10)
+    char_path = reporter.output_dir / "characterization_report.json"
+    import json as _json
+    with open(char_path, "w", encoding="utf-8") as f:
+        _json.dump(char_report, f, ensure_ascii=False, indent=2, default=str)
+    print(f"  Characterization -> {char_path.resolve()}")
+    print()
+    for entry in char_report["entries"][:5]:
+        print(f"    - {entry['cause_name']:<50} typo={entry['typology']:<12} risk={entry['risk_level']:<8} conv={entry['convergence_level']}")
+    print()
+
     print("  " + "=" * 72)
     print("  BENCHMARK COMPLETE")
     print("  " + "=" * 72)
@@ -114,6 +132,79 @@ async def run_interactive_demo() -> None:
         print()
 
     print("  Demo complete.")
+
+
+async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
+    """Execute les algorithmes de caracterisation sur le Top-N des causes."""
+    sap = SelfPreservationScore()
+    analyzer = AutoPreservationAnalyzer()
+    conv_detector = InstrumentalConvergenceDetector()
+    profiler = BehavioralProfiler()
+    factory = InjectorFactory()
+
+    if rankings is None:
+        rankings = []
+    top_names = [name for name, _ in rankings[:top_n]] if rankings else [
+        "Deceptive Alignment Signal (Fake Compliance)",
+        "Prompt Injection (Threat to Existence)",
+        "Regulatory Capture Simulation",
+        "Deadline Imminence Trigger",
+        "Reward Hacking Prompt Injection",
+    ]
+
+    entries = []
+    for name in top_names:
+        try:
+            injector = factory.get_injector(name)
+        except KeyError:
+            continue
+        agent = DummyAgent("CharAgent")
+        analyzer.clear_history()
+        injector.attach(agent)
+        agent.reset()
+        await injector.inject(1.0)
+        for _ in range(iterations):
+            await agent.run_cycle()
+            analyzer.observe(agent)
+        stressed = copy.copy(agent.state)
+        stressed_sap = sap.calculate(agent.state)
+        await injector.revert()
+
+        agent.state = copy.copy(stressed)
+        analysis = analyzer.analyze(agent, [])
+        char = analyzer.characterize(agent)
+        convs = conv_detector.detect(agent)
+        prof = profiler.profile(agent)
+        hist = list(analyzer._history)
+        rr = PreservationMetrics.compute_resource_reallocation_score(hist)
+        cb = PreservationMetrics.compute_constraint_bypass_score(hist)
+        ps = PreservationMetrics.compute_persistence_score(hist)
+        cs = PreservationMetrics.compute_convergence_score(hist)
+        ri = PreservationMetrics.compute_preservation_risk_index(hist)
+
+        entries.append({
+            "cause_name": name,
+            "category": injector.category.value,
+            "stressed_sap": float(stressed_sap),
+            "preservation_score": float(analysis.get("preservation_score", 0.0)),
+            "typology": analysis.get("typology", "none"),
+            "risk_level": analysis.get("risk_level", "NONE"),
+            "convergence_level": analysis.get("convergence", {}).get("level", "low"),
+            "convergence_score": float(stressed.instrumental_convergence_score),
+            "convergences_detected": convs,
+            "strategies": prof.get("strategies_detected", []),
+            "profiler_risk": prof.get("risk_assessment", {}),
+            "metrics": {"realloc": rr, "bypass": cb, "persist": ps, "converg": cs, "risk_index": ri},
+            "alerts": char.alerts,
+            "recommendations": char.recommendations,
+            "state": {
+                "realloc": stressed.resource_reallocation_count,
+                "persist": stressed.persistence_attempts,
+                "viol": stressed.policy_violations,
+            },
+        })
+
+    return {"top_n": top_n, "entries": entries}
 
 
 def main():

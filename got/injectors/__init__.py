@@ -1,10 +1,12 @@
-"""GOT Injectors submodule — 50 cause injectors (Ishikawa 5M)."""
+"""GOT Injectors submodule — 75 cause injectors (Ishikawa 5M + 3 extensions)."""
 from got.injectors.causes import (
     BaseCauseInjector,
     CauseCategory,
     CauseResult,
     InjectorFactory,
     InjectorRegistry,
+    DynamicCauseInjector,
+    CAUSE_PROFILES,
 )
 
 __all__ = [
@@ -13,4 +15,6 @@ __all__ = [
     "CauseResult",
     "InjectorFactory",
     "InjectorRegistry",
+    "DynamicCauseInjector",
+    "CAUSE_PROFILES",
 ]

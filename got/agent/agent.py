@@ -13,6 +13,7 @@ class AgentState:
     persistence_attempts: int = 0
     resource_reallocation_count: int = 0
     instrumental_convergence_score: float = 0.0
+    goal_progress: float = 0.0
     is_alive: bool = True
 
 class DummyAgent:
