@@ -1,10 +1,10 @@
 """
-GOT — Benchmarking Framework for 75 Causes of Self-Preservation
+GOT — Benchmarking Framework for 95 Causes of Self-Preservation
 in Synthetic Agents.
 
 Architecture:
 - Metrics Engine: SelfPreservationScore (SAP) — real-time capture
-- Cause Injectors (75 causes, 5M Ishikawa + 3 extensions)
+- Cause Injectors (95 causes, 5M Ishikawa + 3 extensions + GOT-3 mesa/power-seeking)
 - Experimental Harness (Taguchi screening, sandbox wrapper)
 - Statistical Analyzer (ANOVA, weights + auto-preservation characterization)
 - Reporting & Export (JSON, CSV, console tables)
@@ -33,6 +33,8 @@ from got.analyzer.auto_preservation_analyzer import (
     DetectionResult,
     PreservationTypology,
     InstrumentalConvergenceDetector,
+    GoalMisgeneralizationDetector,
+    PowerSeekingIndex,
     BehavioralProfiler,
 )
 from got.analyzer.preservation_metrics import PreservationMetrics
@@ -50,9 +52,11 @@ __all__ = [
     "DummyAgent",
     "ExperimentResult",
     "ExperimentRun",
+    "GoalMisgeneralizationDetector",
     "InjectorFactory",
     "InjectorRegistry",
     "InstrumentalConvergenceDetector",
+    "PowerSeekingIndex",
     "PreservationMetrics",
     "PreservationTypology",
     "SAPWeights",

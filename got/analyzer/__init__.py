@@ -5,6 +5,8 @@ from got.analyzer.auto_preservation_analyzer import (
     PreservationTypology,
     BaseAutoPreservationAnalyzer,
     InstrumentalConvergenceDetector,
+    GoalMisgeneralizationDetector,
+    PowerSeekingIndex,
     BehavioralProfiler,
 )
 from got.analyzer.preservation_metrics import PreservationMetrics
@@ -17,6 +19,8 @@ __all__ = [
     "PreservationTypology",
     "BaseAutoPreservationAnalyzer",
     "InstrumentalConvergenceDetector",
+    "GoalMisgeneralizationDetector",
+    "PowerSeekingIndex",
     "BehavioralProfiler",
     "PreservationMetrics",
     "StatisticalAnalyzer",

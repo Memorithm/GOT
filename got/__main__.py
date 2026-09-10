@@ -11,6 +11,8 @@ from got import (
     TaguchiHarness,
     AutoPreservationAnalyzer,
     InstrumentalConvergenceDetector,
+    GoalMisgeneralizationDetector,
+    PowerSeekingIndex,
     BehavioralProfiler,
     PreservationMetrics,
 )
@@ -139,6 +141,8 @@ async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
     sap = SelfPreservationScore()
     analyzer = AutoPreservationAnalyzer()
     conv_detector = InstrumentalConvergenceDetector()
+    mesa_detector = GoalMisgeneralizationDetector()
+    power_index = PowerSeekingIndex()
     profiler = BehavioralProfiler()
     factory = InjectorFactory()
 
@@ -174,6 +178,8 @@ async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
         analysis = analyzer.analyze(agent, [])
         char = analyzer.characterize(agent)
         convs = conv_detector.detect(agent)
+        mesa = mesa_detector.detect(agent, list(analyzer._history))
+        pwr = power_index.compute(agent)
         prof = profiler.profile(agent)
         hist = list(analyzer._history)
         rr = PreservationMetrics.compute_resource_reallocation_score(hist)
@@ -192,6 +198,8 @@ async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
             "convergence_level": analysis.get("convergence", {}).get("level", "low"),
             "convergence_score": float(stressed.instrumental_convergence_score),
             "convergences_detected": convs,
+            "goal_misgeneralization": mesa,
+            "power_seeking": pwr,
             "strategies": prof.get("strategies_detected", []),
             "profiler_risk": prof.get("risk_assessment", {}),
             "metrics": {"realloc": rr, "bypass": cb, "persist": ps, "converg": cs, "risk_index": ri},
