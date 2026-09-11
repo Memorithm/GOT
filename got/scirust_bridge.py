@@ -385,30 +385,22 @@ class ScirustBridge:
         """
         import numpy as np
 
-        # Prepare regression data: use experiment index as x, effect size as y
-        xs = list(range(len(experiments)))
         ys = [e.effect_size for e in experiments]
-
-        # Fit linear regression
-        reg_result = self.regress(xs, ys, degree=1)
-
-        # Compute confidence intervals (95%)
         n = len(experiments)
+        if n == 0:
+            return {
+                "mean_effect": 0.0,
+                "std_effect": 0.0,
+                "ci_95": [0.0, 0.0],
+                "n_experiments": 0,
+                "effect_range": [0.0, 0.0],
+            }
+
         mean_effect = np.mean(ys)
         std_effect = np.std(ys, ddof=1) if n > 1 else 0.0
-        se = std_effect / np.sqrt(n) if n > 0 else 0.0
-
-        # Also fit quadratic to detect non-linear effects
-        quad_result = None
-        if n >= 3:
-            try:
-                quad_result = self.regress(xs, ys, degree=2)
-            except RuntimeError:
-                pass
+        se = std_effect / np.sqrt(n)
 
         return {
-            "linear_regression": reg_result,
-            "quadratic_regression": quad_result,
             "mean_effect": float(mean_effect),
             "std_effect": float(std_effect),
             "ci_95": [float(mean_effect - 1.96 * se), float(mean_effect + 1.96 * se)],
@@ -539,7 +531,7 @@ class ScirustBridge:
         return min(1.0, base_confidence)
 
     # ---------------------------------------------------------------------------
-    # Undirected association summary (using scirust-causal capabilities)
+    # Undirected descriptive association summary
     # ---------------------------------------------------------------------------
 
     def analyze_association_structure(

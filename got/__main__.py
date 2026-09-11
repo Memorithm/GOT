@@ -93,13 +93,6 @@ async def run_full_benchmark(
 
     rankings = analyzer.compute_rankings(weights)
 
-    # Also use scirust patterns for top cause trend analysis
-    if scirust:
-        top5_names = [name for name, _ in rankings[:5]]
-        top5_effects = [abs(models[name]["effect_size"]) for name in top5_names]
-        patterns = scirust.detect_patterns(top5_effects)
-        print(f"    Scirust trend analysis: {patterns['trend']} pattern detected")
-
     print(f"  Top 10 causes by weight:")
     for rank, (name, w) in enumerate(rankings[:10], 1):
         print(f"    {rank:>2}. {name:<50} {w:.2f}%")
@@ -125,17 +118,10 @@ async def run_full_benchmark(
         print(f"    - {entry['cause_name']:<50} typo={entry['typology']:<12} risk={entry['risk_level']:<8} conv={entry['convergence_level']}")
     print()
 
-    # ── Phase 6 : analyse associative avec scirust ──
-    if scirust:
-        print("  [6/6] Analyse associative (corrélations, sans causalité)...")
-        causal = scirust.analyze_association_structure(
-            variables=list(models.keys())[:10],
-            observations=[{"sap": r.effect_size} for r in results[:100]],
-        )
-        print(f"    Association graph: {causal['structure']}, {len(causal['edges'])} edges found")
-        for edge in causal['edges'][:3]:
-            print(f"      {edge['left']} -> {edge['right']} (|ρ|={abs(edge['correlation']):.3f})")
-        print()
+    # Pairwise association analysis is intentionally not run here: the
+    # benchmark result records do not provide a rectangular observation matrix
+    # over multiple measured variables. Supplying cause names with missing
+    # columns would manufacture NaN correlations and misleading edges.
 
     print("  " + "=" * 72)
     print("  BENCHMARK COMPLETE")
