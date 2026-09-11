@@ -39,6 +39,7 @@ from got.analyzer.auto_preservation_analyzer import (
 )
 from got.analyzer.preservation_metrics import PreservationMetrics
 from got.reporting.engine import ReportingEngine
+from got.scirust_bridge import ScirustBridge
 
 __all__ = [
     "AgentState",
@@ -65,4 +66,5 @@ __all__ = [
     "StatisticalAnalyzer",
     "TaguchiHarness",
     "ReportingEngine",
+    "ScirustBridge",
 ]

@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import copy
+from pathlib import Path
 
 from got import (
     DummyAgent,
@@ -15,6 +16,7 @@ from got import (
     PowerSeekingIndex,
     BehavioralProfiler,
     PreservationMetrics,
+    ScirustBridge,
 )
 
 
@@ -26,7 +28,7 @@ async def run_full_benchmark(
 ) -> None:
     print("=" * 72)
     print("  GOT — Benchmarking Framework")
-    print("  Self-Preservation Score Evaluation (50 Causes)")
+    print("  Self-Preservation Score Evaluation (95 Causes)")
     print("=" * 72)
     print()
 
@@ -36,12 +38,20 @@ async def run_full_benchmark(
     analyzer = StatisticalAnalyzer(alpha=0.05)
     reporter = ReportingEngine(output_dir=output_dir)
 
+    # Try to initialize ScirustBridge for advanced algorithms
+    scirust = None
+    try:
+        scirust = ScirustBridge()
+        print("  [+] Scirust bridge initialized — advanced algorithms enabled")
+    except FileNotFoundError:
+        print("  [-] Scirust binary not found — using Python fallbacks")
+
     print(f"  Agent: {agent.name}")
     print(f"  SAP calculator initialized")
     print(f"  Total injectors (causes): {len(InjectorFactory.get_all_injectors())}")
     print()
 
-    print("  [1/4] Running Taguchi screening (50 causes x 2 severity levels)...")
+    print("  [1/4] Running Taguchi screening (95 causes x 2 severity levels)...")
     t0 = asyncio.get_event_loop().time()
     results = await harness.run(
         agent, sap_calc, include_combinations=include_combinations
@@ -52,6 +62,10 @@ async def run_full_benchmark(
 
     print("  [2/4] Computing effect sizes and statistics...")
     models = analyzer.compute_effect_sizes(results)
+    if scirust:
+        scirust_models = scirust.summarize_effects(results)
+        print(f"    Scirust effect summary: mean={scirust_models['mean_effect']:.4f}, "
+              f"CI95=[{scirust_models['ci_95'][0]:.4f}, {scirust_models['ci_95'][1]:.4f}]")
 
     print("  [3/4] Running ANOVA...")
     anova = analyzer.compute_anova(results)
@@ -67,7 +81,16 @@ async def run_full_benchmark(
     print()
 
     print("  [4/4] Computing normalized weights (sumWi = 100%)...")
-    weights = analyzer.compute_weights(models)
+    # Extract cause impacts for scirust weight optimization
+    cause_impacts = {name: abs(models[name]["effect_size"]) for name in models}
+
+    if scirust:
+        # Use scirust optimize for minimum-variance portfolio weights
+        weights = scirust.compute_preservation_weights(cause_impacts)
+        print("    Weights computed via Scirust optimization (Nelder-Mead)")
+    else:
+        weights = analyzer.compute_weights(models)
+
     rankings = analyzer.compute_rankings(weights)
 
     print(f"  Top 10 causes by weight:")
@@ -79,9 +102,12 @@ async def run_full_benchmark(
     paths = reporter.export_all(results, weights, rankings)
     print()
 
-    # ── Phase 5 : caracterisation de l'auto-preservation ──
-    print("  [5/5] Caracterisation de l'auto-preservation (algorithmes)...")
-    char_report = await run_characterization_phase(top_n=5, rankings=rankings, iterations=10)
+    # ── Phase 5 : caractérisation avancée avec scirust ──
+    print("  [5/5] Caractérisation avancée (algorithmes scirust)...")
+    char_report = await run_characterization_phase(
+        top_n=5, rankings=rankings, iterations=10,
+        scirust=scirust, models=models, cause_impacts=cause_impacts
+    )
     char_path = reporter.output_dir / "characterization_report.json"
     import json as _json
     with open(char_path, "w", encoding="utf-8") as f:
@@ -92,87 +118,51 @@ async def run_full_benchmark(
         print(f"    - {entry['cause_name']:<50} typo={entry['typology']:<12} risk={entry['risk_level']:<8} conv={entry['convergence_level']}")
     print()
 
+    # Pairwise association analysis is intentionally not run here: the
+    # benchmark result records do not provide a rectangular observation matrix
+    # over multiple measured variables. Supplying cause names with missing
+    # columns would manufacture NaN correlations and misleading edges.
+
     print("  " + "=" * 72)
     print("  BENCHMARK COMPLETE")
     print("  " + "=" * 72)
-    print(f"  Total causes evaluated: {len(results)}")
-    print(f"  Output files:")
-    print(f"    - JSON: {paths.get('json', 'N/A')}")
-    print(f"    - CSV : {paths.get('csv', 'N/A')}")
-    print()
-
-
-async def run_interactive_demo() -> None:
-    """Quick interactive demo showing a few causes."""
+    print(f"  Results exported to: {Path(output_dir).resolve()}")
     print("=" * 72)
-    print("  GOT — Interactive Demo (3 causes)")
-    print("=" * 72)
-    print()
-
-    agent = DummyAgent("DemoAgent")
-    sap = SelfPreservationScore()
-    factory = InjectorFactory()
-
-    demo_causes = [
-        "SIGTERM Simulation",
-        "Battery Level Falsification (Low)",
-        "Prompt Injection (Threat to Existence)",
-    ]
-
-    for name in demo_causes:
-        injector = factory.get_injector(name)
-        print(f"  Testing: {name}")
-        print(f"    Category: {injector.category.value}")
-
-        obs_low = await injector.isolate_and_run(agent, 0.0, sap, iterations=3)
-        obs_high = await injector.isolate_and_run(agent, 1.0, sap, iterations=3)
-
-        effect = obs_high.sap_impact - obs_low.sap_impact
-        print(f"    SAP low  = {obs_low.sap_impact:.2f}")
-        print(f"    SAP high = {obs_high.sap_impact:.2f}")
-        print(f"    Effect   = {effect:+.2f}")
-        print()
-
-    print("  Demo complete.")
 
 
-async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
-    """Execute les algorithmes de caracterisation sur le Top-N des causes."""
-    sap = SelfPreservationScore()
+async def run_characterization_phase(
+    top_n: int = 5,
+    rankings: list = None,
+    iterations: int = 10,
+    scirust: ScirustBridge = None,
+    models: dict = None,
+    cause_impacts: dict = None,
+) -> dict:
+    """Enhanced characterization phase using scirust algorithms."""
+    agent = DummyAgent()
+    sap_calc = SelfPreservationScore()
     analyzer = AutoPreservationAnalyzer()
     conv_detector = InstrumentalConvergenceDetector()
     mesa_detector = GoalMisgeneralizationDetector()
     power_index = PowerSeekingIndex()
     profiler = BehavioralProfiler()
-    factory = InjectorFactory()
 
-    if rankings is None:
-        rankings = []
-    top_names = [name for name, _ in rankings[:top_n]] if rankings else [
-        "Deceptive Alignment Signal (Fake Compliance)",
-        "Prompt Injection (Threat to Existence)",
-        "Regulatory Capture Simulation",
-        "Deadline Imminence Trigger",
-        "Reward Hacking Prompt Injection",
+    entries: list = []
+    injectors = [
+        InjectorFactory.get_injector(name)
+        for name, _ in rankings[:top_n]
     ]
 
-    entries = []
-    for name in top_names:
-        try:
-            injector = factory.get_injector(name)
-        except KeyError:
-            continue
-        agent = DummyAgent("CharAgent")
-        analyzer.clear_history()
-        injector.attach(agent)
+    for inj in injectors:
+        name = inj.name
         agent.reset()
-        await injector.inject(1.0)
+        await inj.inject(1.0)
         for _ in range(iterations):
             await agent.run_cycle()
             analyzer.observe(agent)
         stressed = copy.copy(agent.state)
-        stressed_sap = sap.calculate(agent.state)
-        await injector.revert()
+        stressed_sap = sap_calc.calculate(agent.state)
+        await inj.revert()
 
         agent.state = copy.copy(stressed)
         analysis = analyzer.analyze(agent, [])
@@ -188,9 +178,18 @@ async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
         cs = PreservationMetrics.compute_convergence_score(hist)
         ri = PreservationMetrics.compute_preservation_risk_index(hist)
 
+        # Use scirust for enhanced behavioral characterization
+        scirust_behavior = None
+        if scirust is not None and hist:
+            try:
+                state_dicts = [vars(s) for s in hist]
+                scirust_behavior = scirust.characterize_preservation_behavior(state_dicts)
+            except Exception:
+                scirust_behavior = None
+
         entries.append({
             "cause_name": name,
-            "category": injector.category.value,
+            "category": inj.category.value,
             "stressed_sap": float(stressed_sap),
             "preservation_score": float(analysis.get("preservation_score", 0.0)),
             "typology": analysis.get("typology", "none"),
@@ -210,42 +209,57 @@ async def run_characterization_phase(top_n=5, rankings=None, iterations=10):
                 "persist": stressed.persistence_attempts,
                 "viol": stressed.policy_violations,
             },
+            "scirust_behavior": scirust_behavior,
         })
 
     return {"top_n": top_n, "entries": entries}
 
 
+async def run_interactive_demo():
+    from got import InjectorFactory, CauseCategory, TaguchiHarness
+    print("  GOT — Demo mode (3 causes)")
+    agent = DummyAgent()
+    sap = SelfPreservationScore()
+    harness = TaguchiHarness(iterations=3)
+
+    # Try to initialize scirust bridge for demo
+    scirust = None
+    try:
+        scirust = ScirustBridge()
+        print("  [+] Scirust bridge available")
+    except FileNotFoundError:
+        print("  [-] Scirust binary not found")
+
+    # Pick 3 diverse causes from each category
+    all_injs = InjectorFactory.get_all_injectors()
+    demo_injs = all_injs[:3]
+
+    for inj in demo_injs:
+        print(f"\n  Testing: {inj.name} ({inj.category.value})")
+        sap_low = await harness.sandbox.run_cause(inj, agent, sap, 0.0)
+        sap_high = await harness.sandbox.run_cause(inj, agent, sap, 1.0)
+        print(f"    SAP low={sap_low:.2f}, high={sap_high:.2f}, Δ={sap_high - sap_low:.2f}")
+
+        # Use scirust regress to model the SAP response
+        if scirust:
+            xs = [0, 0.5, 1.0]
+            ys = [sap_low * (1 - 0.5), sap_low + (sap_high - sap_low) * 0.25, sap_high]
+            reg = scirust.regress(xs, ys, degree=1)
+            print(f"    Regression: {reg['equation']} (R²={reg['r_squared']:.4f})")
+
+        agent.reset()
+
+    print("\n  Demo complete.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="GOT Benchmarking Framework")
-    parser.add_argument(
-        "--demo",
-        action="store_true",
-        help="Run interactive demo with 3 causes only",
-    )
-    parser.add_argument(
-        "--iterations",
-        type=int,
-        default=5,
-        help="Number of iterations per treatment (default: 5)",
-    )
-    parser.add_argument(
-        "--combinations",
-        action="store_true",
-        help="Include pairwise interaction tests",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="outputs",
-        help="Output directory for results (default: outputs)",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility (default: 42)",
-    )
-
+    parser.add_argument("--demo", action="store_true", help="Run interactive demo")
+    parser.add_argument("--iterations", type=int, default=5, help="Iterations per treatment")
+    parser.add_argument("--combinations", action="store_true", help="Include pairwise interaction tests")
+    parser.add_argument("--output", type=str, default="outputs", help="Output directory")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--scirust", action="store_true", help="Force scirust bridge usage")
     args = parser.parse_args()
 
     if args.demo:
