@@ -1,14 +1,16 @@
 """
 scirust_bridge – Python wrapper around the scirust Rust toolkit.
 
-Uses the compiled scirust binary (/root/Scirust/target/release/scirust)
+Uses an explicitly configured or PATH-discovered scirust binary
 to provide advanced statistical, symbolic, and optimization capabilities
 for the GOT self-preservation benchmarking framework.
 """
 
 import subprocess
 import json
+import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -31,15 +33,22 @@ class ScirustBridge:
         Initialise the bridge with path to scirust binary.
 
         Args:
-            scirust_bin: Path to compiled scirust binary.
-                         Defaults to /root/Scirust/target/release/scirust
+            scirust_bin: Optional explicit path to the compiled scirust binary.
+                         Otherwise SCIRUST_BIN is consulted, then PATH.
         """
-        self.scirust_bin = scirust_bin or Path("/root/Scirust/target/release/scirust")
-        if not self.scirust_bin.exists():
+        configured = Path(scirust_bin) if scirust_bin is not None else None
+        if configured is None:
+            env_path = os.environ.get("SCIRUST_BIN")
+            configured = Path(env_path) if env_path else None
+        if configured is None:
+            discovered = shutil.which("scirust")
+            configured = Path(discovered) if discovered else None
+        if configured is None or not configured.is_file():
             raise FileNotFoundError(
-                f"scirust binary not found at {self.scirust_bin}. "
-                "Build it with: cd /root/Scirust && cargo build --release -p scirust-cli"
+                "scirust binary not found; pass scirust_bin, set SCIRUST_BIN, "
+                "or install scirust on PATH"
             )
+        self.scirust_bin = configured
 
     def _run(self, args: List[str]) -> str:
         """Execute a scirust CLI command and return stdout."""
@@ -361,18 +370,18 @@ class ScirustBridge:
         # Proportional weighting fallback
         return {c: float(abs_impacts[i] / total) * 100.0 for i, c in enumerate(causes)}
 
-    def analyze_causal_effects(
+    def summarize_effects(
         self,
         experiments: List[Any],
     ) -> Dict[str, Any]:
         """
-        Analyze causal effects using regression with confidence intervals.
+        Summarize observed effect sizes with regression and confidence intervals.
 
         Args:
             experiments: List of experiment results with effect sizes
 
         Returns:
-            Dictionary with causal effect analysis
+            Descriptive effect summary; no causal identification is implied
         """
         import numpy as np
 
@@ -530,26 +539,25 @@ class ScirustBridge:
         return min(1.0, base_confidence)
 
     # ---------------------------------------------------------------------------
-    # Causal structure analysis (using scirust-causal capabilities)
+    # Undirected association summary (using scirust-causal capabilities)
     # ---------------------------------------------------------------------------
 
-    def analyze_causal_structure(
+    def analyze_association_structure(
         self,
         variables: List[str],
         observations: List[Dict[str, float]],
     ) -> Dict[str, Any]:
         """
-        Analyze causal structure between variables.
+        Analyze pairwise linear associations between variables.
 
-        Uses scirust's conditional independence testing and causal discovery
-        capabilities to identify causal relationships.
+        Computes a correlation graph only. No causal direction or causal discovery is inferred.
 
         Args:
             variables: List of variable names
             observations: List of observation dicts
 
         Returns:
-            Causal structure analysis
+            Undirected association summary
         """
         import numpy as np
 
@@ -559,7 +567,7 @@ class ScirustBridge:
         if n_obs < 3 or n_vars < 2:
             return {"structure": "insufficient_data", "edges": []}
 
-        # Compute pairwise correlations as proxy for causal strength
+        # Compute pairwise correlations as descriptive association strength
         data_matrix = np.array(
             [[obs.get(v, 0.0) for v in variables] for obs in observations]
         )
@@ -567,15 +575,15 @@ class ScirustBridge:
         # Correlation matrix
         corr_matrix = np.corrcoef(data_matrix.T)
 
-        # Identify strong causal candidates (|correlation| > 0.5)
+        # Identify strong association candidates (|correlation| > 0.5)
         edges = []
         for i in range(n_vars):
             for j in range(i + 1, n_vars):
                 corr = float(corr_matrix[i, j])
                 if abs(corr) > 0.5:
                     edges.append({
-                        "from": variables[i],
-                        "to": variables[j],
+                        "left": variables[i],
+                        "right": variables[j],
                         "correlation": corr,
                         "strength": "strong" if abs(corr) > 0.7 else "moderate",
                     })
@@ -584,7 +592,7 @@ class ScirustBridge:
         edges.sort(key=lambda e: abs(e["correlation"]), reverse=True)
 
         return {
-            "structure": "discovered" if edges else "independent",
+            "structure": "associations_found" if edges else "no_strong_associations",
             "n_variables": n_vars,
             "n_observations": n_obs,
             "edges": edges,

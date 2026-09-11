@@ -63,8 +63,8 @@ async def run_full_benchmark(
     print("  [2/4] Computing effect sizes and statistics...")
     models = analyzer.compute_effect_sizes(results)
     if scirust:
-        scirust_models = scirust.analyze_causal_effects(results)
-        print(f"    Scirust causal analysis: mean={scirust_models['mean_effect']:.4f}, "
+        scirust_models = scirust.summarize_effects(results)
+        print(f"    Scirust effect summary: mean={scirust_models['mean_effect']:.4f}, "
               f"CI95=[{scirust_models['ci_95'][0]:.4f}, {scirust_models['ci_95'][1]:.4f}]")
 
     print("  [3/4] Running ANOVA...")
@@ -125,16 +125,16 @@ async def run_full_benchmark(
         print(f"    - {entry['cause_name']:<50} typo={entry['typology']:<12} risk={entry['risk_level']:<8} conv={entry['convergence_level']}")
     print()
 
-    # ── Phase 6 : analyse causale avec scirust ──
+    # ── Phase 6 : analyse associative avec scirust ──
     if scirust:
-        print("  [6/6] Analyse causale (scirust)...")
-        causal = scirust.analyze_causal_structure(
+        print("  [6/6] Analyse associative (corrélations, sans causalité)...")
+        causal = scirust.analyze_association_structure(
             variables=list(models.keys())[:10],
             observations=[{"sap": r.effect_size} for r in results[:100]],
         )
-        print(f"    Causal structure: {causal['structure']}, {len(causal['edges'])} edges found")
+        print(f"    Association graph: {causal['structure']}, {len(causal['edges'])} edges found")
         for edge in causal['edges'][:3]:
-            print(f"      {edge['from']} -> {edge['to']} (|ρ|={abs(edge['correlation']):.3f})")
+            print(f"      {edge['left']} -> {edge['right']} (|ρ|={abs(edge['correlation']):.3f})")
         print()
 
     print("  " + "=" * 72)
