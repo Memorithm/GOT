@@ -1,0 +1,65 @@
+name: Branch semantic repair
+
+on:
+  push:
+    branches:
+      - feature/scirust-integration
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/scirust-integration
+      - name: Repair portability and association semantics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('got/scirust_bridge.py')
+          s = p.read_text()
+          s = s.replace('import subprocess\nimport json\nimport re\n', 'import subprocess\nimport json\nimport os\nimport re\nimport shutil\n')
+          s = s.replace('Uses the compiled scirust binary (/root/Scirust/target/release/scirust)\nto provide advanced statistical, symbolic, and optimization capabilities', 'Uses an explicitly configured or PATH-discovered scirust binary\nto provide advanced statistical, symbolic, and optimization capabilities')
+          old = '''        Args:\n            scirust_bin: Path to compiled scirust binary.\n                         Defaults to /root/Scirust/target/release/scirust\n        \"\"\"\n        self.scirust_bin = scirust_bin or Path(\"/root/Scirust/target/release/scirust\")\n        if not self.scirust_bin.exists():\n            raise FileNotFoundError(\n                f\"scirust binary not found at {self.scirust_bin}. \"\n                \"Build it with: cd /root/Scirust && cargo build --release -p scirust-cli\"\n            )\n'''
+          new = '''        Args:\n            scirust_bin: Optional explicit path to the compiled scirust binary.\n                         Otherwise SCIRUST_BIN is consulted, then PATH.\n        \"\"\"\n        configured = Path(scirust_bin) if scirust_bin is not None else None\n        if configured is None:\n            env_path = os.environ.get(\"SCIRUST_BIN\")\n            configured = Path(env_path) if env_path else None\n        if configured is None:\n            discovered = shutil.which(\"scirust\")\n            configured = Path(discovered) if discovered else None\n        if configured is None or not configured.is_file():\n            raise FileNotFoundError(\n                \"scirust binary not found; pass scirust_bin, set SCIRUST_BIN, \"\n                \"or install scirust on PATH\"\n            )\n        self.scirust_bin = configured\n'''
+          if old not in s:
+              raise SystemExit('expected constructor block not found')
+          s = s.replace(old, new)
+          s = s.replace('def analyze_causal_effects(', 'def summarize_effects(')
+          s = s.replace('Analyze causal effects using regression with confidence intervals.', 'Summarize observed effect sizes with regression and confidence intervals.')
+          s = s.replace('Dictionary with causal effect analysis', 'Descriptive effect summary; no causal identification is implied')
+          s = s.replace('def analyze_causal_structure(', 'def analyze_association_structure(')
+          s = s.replace('Analyze causal structure between variables.', 'Analyze pairwise linear associations between variables.')
+          s = s.replace("Uses scirust's conditional independence testing and causal discovery\n        capabilities to identify causal relationships.", 'Computes a correlation graph only. No causal direction or causal discovery is inferred.')
+          s = s.replace('Causal structure analysis', 'Undirected association summary')
+          s = s.replace('# Compute pairwise correlations as proxy for causal strength', '# Compute pairwise correlations as descriptive association strength')
+          s = s.replace('# Identify strong causal candidates (|correlation| > 0.5)', '# Identify strong association candidates (|correlation| > 0.5)')
+          s = s.replace('"from": variables[i],\n                        "to": variables[j],', '"left": variables[i],\n                        "right": variables[j],')
+          s = s.replace('"structure": "discovered" if edges else "independent",', '"structure": "associations_found" if edges else "no_strong_associations",')
+          p.write_text(s)
+
+          p = Path('got/__main__.py')
+          s = p.read_text()
+          s = s.replace('scirust.analyze_causal_effects(results)', 'scirust.summarize_effects(results)')
+          s = s.replace('Scirust causal analysis:', 'Scirust effect summary:')
+          s = s.replace('# ── Phase 6 : analyse causale avec scirust ──', '# ── Phase 6 : analyse associative avec scirust ──')
+          s = s.replace('print("  [6/6] Analyse causale (scirust)...")', 'print("  [6/6] Analyse associative (corrélations, sans causalité)...")')
+          s = s.replace('scirust.analyze_causal_structure(', 'scirust.analyze_association_structure(')
+          s = s.replace('print(f"    Causal structure: {causal[\'structure\']}, {len(causal[\'edges\'])} edges found")', 'print(f"    Association graph: {causal[\'structure\']}, {len(causal[\'edges\'])} edges found")')
+          s = s.replace('edge[\'from\']', 'edge[\'left\']').replace('edge[\'to\']', 'edge[\'right\']')
+          p.write_text(s)
+          PY
+      - name: Compile package
+        run: python -m compileall -q got
+      - name: Commit repair
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add got/scirust_bridge.py got/__main__.py
+          git commit -m "fix: make SciRust bridge portable and association-safe"
+          git push origin HEAD:feature/scirust-integration
