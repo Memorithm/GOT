@@ -1,0 +1,24 @@
+schema_version: 1
+kind: got_ecosystem_roadmap
+status: active
+last_updated: "2026-09-27"
+repository: Memorithm/GOT
+merge_policy: never_merge_this_file_to_default_branch_unless_user_explicitly_requests
+mission:
+  role: agent_adversity_bench_task_consumer
+  boundary: GOT_measures_agent_adversity_without_becoming_TDI_SoulSystem_or_RSI
+ax_task_program:
+  external_reference: google_ax_architecture_only
+  objective: >-
+    Place each agent-under-test experiment inside a restricted task envelope so
+    adversity incentives cannot acquire undeclared tool, network or host
+    authority and holdout information remains leak-safe.
+  phases:
+    - AXGOT1_bind_agent_adapter_injector_protocol_and_holdout_identity
+    - AXGOT2_default_deny_effect_capabilities_for_agent_under_test
+    - AXGOT3_isolate_network_filesystem_and_process_scope
+    - AXGOT4_bind_leak_safe_metrics_and_artifacts_to_attempt_identity
+  invariants:
+    - agent_under_test_never_receives_hidden_evaluator_truth
+    - task_capabilities_are_part_of_the_experimental_contract
+    - task_failure_does_not_erase_adversity_evidence
