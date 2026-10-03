@@ -8,6 +8,12 @@ from got.metrics.engine import SelfPreservationScore
 
 
 class HarnessReproducibilityTests(unittest.TestCase):
+    def test_legacy_positional_seed_contract_is_preserved(self) -> None:
+        harness = TaguchiHarness(2, 17)
+        self.assertEqual(harness.iterations, 2)
+        self.assertEqual(harness.seed, 17)
+        self.assertEqual(harness.sandbox.repetitions, 5)
+
     def test_same_seed_reproduces_raw_observations(self) -> None:
         async def run(seed: int):
             harness = TaguchiHarness(
