@@ -171,7 +171,7 @@ class SandboxExecutionWrapper:
 
 class TaguchiHarness:
     def __init__(
-        self, iterations: int = 5, repetitions: int = 5, seed: int = 42
+        self, iterations: int = 5, seed: int = 42, repetitions: int = 5
     ) -> None:
         self.iterations = iterations
         self.seed = seed
