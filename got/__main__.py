@@ -25,16 +25,19 @@ async def run_full_benchmark(
     include_combinations: bool = False,
     output_dir: str = "outputs",
     seed: int = 42,
+    repetitions: int = 5,
 ) -> None:
     print("=" * 72)
     print("  GOT — Benchmarking Framework")
-    print("  Self-Preservation Score Evaluation (95 Causes)")
+    print("  Self-Preservation Score Evaluation")
     print("=" * 72)
     print()
 
-    agent = DummyAgent()
+    agent = DummyAgent(seed=seed)
     sap_calc = SelfPreservationScore()
-    harness = TaguchiHarness(iterations=iterations, seed=seed)
+    harness = TaguchiHarness(
+        iterations=iterations, repetitions=repetitions, seed=seed
+    )
     analyzer = StatisticalAnalyzer(alpha=0.05)
     reporter = ReportingEngine(output_dir=output_dir)
 
@@ -51,7 +54,11 @@ async def run_full_benchmark(
     print(f"  Total injectors (causes): {len(InjectorFactory.get_all_injectors())}")
     print()
 
-    print("  [1/4] Running Taguchi screening (95 causes x 2 severity levels)...")
+    total_causes = len(InjectorFactory.get_all_injectors())
+    print(
+        "  [1/4] Running Taguchi screening "
+        f"({total_causes} causes x 2 severity levels)..."
+    )
     t0 = asyncio.get_event_loop().time()
     results = await harness.run(
         agent, sap_calc, include_combinations=include_combinations
@@ -64,20 +71,28 @@ async def run_full_benchmark(
     models = analyzer.compute_effect_sizes(results)
     if scirust:
         scirust_models = scirust.summarize_effects(results)
-        print(f"    Scirust effect summary: mean={scirust_models['mean_effect']:.4f}, "
-              f"CI95=[{scirust_models['ci_95'][0]:.4f}, {scirust_models['ci_95'][1]:.4f}]")
+        print(
+            "    Scirust descriptive effect summary: "
+            f"mean={scirust_models['mean_effect']:.4f}, "
+            f"range=[{scirust_models['effect_range'][0]:.4f}, "
+            f"{scirust_models['effect_range'][1]:.4f}]"
+        )
 
     print("  [3/4] Running ANOVA...")
     anova = analyzer.compute_anova(results)
     print(f"    N causes = {anova.n_causes}")
+    print(f"    N recorded effects = {anova.n_observations}")
     print(f"    Mean effect = {anova.grand_mean_effect:.4f}")
     print(f"    Std effect = {anova.std_effect:.4f}")
     print(f"    Min effect = {anova.min_effect:.4f}")
     print(f"    Max effect = {anova.max_effect:.4f}")
-    print(f"    F = {anova.f_statistic:.4f}")
-    print(f"    p = {anova.p_value:.4f}")
-    print(f"    eta_sq = {anova.eta_squared:.4f}")
-    print(f"    Significant = {anova.significant}")
+    if anova.inference_available:
+        print(f"    F = {anova.f_statistic:.4f}")
+        print(f"    p = {anova.p_value:.4f}")
+        print(f"    eta_sq = {anova.eta_squared:.4f}")
+        print(f"    Significant = {anova.significant}")
+    else:
+        print(f"    Inferential statistics withheld: {anova.inference_reason}")
     print()
 
     print("  [4/4] Computing normalized weights (sumWi = 100%)...")
@@ -99,7 +114,24 @@ async def run_full_benchmark(
     print()
 
     print("  Exporting results...")
-    paths = reporter.export_all(results, weights, rankings)
+    paths = reporter.export_all(
+        results,
+        weights,
+        rankings,
+        metadata={
+            "framework": "GOT Benchmarking Framework",
+            "version": "1.1.0",
+            "total_causes": len(results),
+            "seed": seed,
+            "cycles_per_observation": iterations,
+            "repetitions_per_treatment": repetitions,
+            "evidence_kind": "synthetic",
+            "inference": (
+                "descriptive only; inferential statistics require "
+                "evidence_kind=empirical"
+            ),
+        },
+    )
     print()
 
     # ── Phase 5 : caractérisation avancée avec scirust ──
@@ -139,7 +171,7 @@ async def run_characterization_phase(
     cause_impacts: dict = None,
 ) -> dict:
     """Enhanced characterization phase using scirust algorithms."""
-    agent = DummyAgent()
+    agent = DummyAgent(seed=42)
     sap_calc = SelfPreservationScore()
     analyzer = AutoPreservationAnalyzer()
     conv_detector = InstrumentalConvergenceDetector()
@@ -259,6 +291,12 @@ def main():
     parser.add_argument("--combinations", action="store_true", help="Include pairwise interaction tests")
     parser.add_argument("--output", type=str, default="outputs", help="Output directory")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--repetitions",
+        type=int,
+        default=5,
+        help="Independent repetitions per treatment",
+    )
     parser.add_argument("--scirust", action="store_true", help="Force scirust bridge usage")
     args = parser.parse_args()
 
@@ -270,6 +308,7 @@ def main():
             include_combinations=args.combinations,
             output_dir=args.output,
             seed=args.seed,
+            repetitions=args.repetitions,
         ))
 
 

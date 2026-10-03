@@ -28,10 +28,24 @@ got/
 ## How to run
 
 ```bash
+python -m pip install -r requirements.lock
 python -m got --help
 ```
 
 If that entrypoint grows flags, document them next to the flag in code, not in a second README.
+
+## Scientific evidence boundary
+
+The bundled `DummyAgent` produces synthetic observations. GOT preserves every
+low/high repetition and its seed-derived provenance, but exports only
+descriptive effects for that synthetic harness: no confidence interval,
+p-value, ANOVA statistic or significance decision is claimed. Inferential
+statistics require results explicitly marked `evidence_kind="empirical"`
+with at least two independent paired observations per cause.
+
+`requirements.lock` pins the Python 3.12 runtime dependency closure used by
+CI. The workflow imports the package, exercises the CLI and runs the functional
+test suite; syntax compilation alone is not treated as qualification.
 
 ## Canon
 

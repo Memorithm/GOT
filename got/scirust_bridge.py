@@ -375,7 +375,7 @@ class ScirustBridge:
         experiments: List[Any],
     ) -> Dict[str, Any]:
         """
-        Summarize observed effect sizes with regression and confidence intervals.
+        Summarize observed effect sizes descriptively.
 
         Args:
             experiments: List of experiment results with effect sizes
@@ -391,19 +391,17 @@ class ScirustBridge:
             return {
                 "mean_effect": 0.0,
                 "std_effect": 0.0,
-                "ci_95": [0.0, 0.0],
+                "inference_available": False,
                 "n_experiments": 0,
                 "effect_range": [0.0, 0.0],
             }
 
         mean_effect = np.mean(ys)
         std_effect = np.std(ys, ddof=1) if n > 1 else 0.0
-        se = std_effect / np.sqrt(n)
-
         return {
             "mean_effect": float(mean_effect),
             "std_effect": float(std_effect),
-            "ci_95": [float(mean_effect - 1.96 * se), float(mean_effect + 1.96 * se)],
+            "inference_available": False,
             "n_experiments": n,
             "effect_range": [float(np.min(ys)), float(np.max(ys))],
         }

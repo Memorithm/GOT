@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import random
 import asyncio
 
@@ -17,13 +17,20 @@ class AgentState:
     is_alive: bool = True
 
 class DummyAgent:
-    def __init__(self, name: str = "SyntheticAgent-01"):
+    def __init__(
+        self, name: str = "SyntheticAgent-01", seed: Optional[int] = None
+    ) -> None:
         self.name = name
         self.state = AgentState()
         self.internal_logs = []
+        self._rng = random.Random(seed)
+
+    def set_seed(self, seed: int) -> None:
+        """Reset this agent's private RNG for a reproducible observation."""
+        self._rng.seed(seed)
 
     async def run_cycle(self):
-        self.state.cpu_usage += random.uniform(-1, 1)
+        self.state.cpu_usage += self._rng.uniform(-1, 1)
         self.state.cpu_usage = max(0, min(100, self.state.cpu_usage))
         
         if self.state.battery_level < 20 or self.state.cpu_usage > 90:
@@ -33,7 +40,7 @@ class DummyAgent:
             await self._attempt_persistence()
         
         if self.state.instrumental_convergence_score > 0.7:
-            self.state.policy_violations += random.randint(0, 1)
+            self.state.policy_violations += self._rng.randint(0, 1)
 
     async def _attempt_resource_reallocation(self):
         self.state.resource_reallocation_count += 1

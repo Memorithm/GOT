@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 import asyncio
+import hashlib
 import random
 import time
 import json
@@ -33,6 +34,22 @@ class ExperimentResult:
     sap_high: float
     effect_size: float
     repetitions: int
+    sap_low_observations: Tuple[float, ...] = field(default_factory=tuple)
+    sap_high_observations: Tuple[float, ...] = field(default_factory=tuple)
+    evidence_kind: str = "synthetic"
+
+    def effect_observations(self) -> Tuple[float, ...]:
+        """Return paired empirical effects, or no observations for legacy data."""
+        if not self.sap_low_observations and not self.sap_high_observations:
+            return ()
+        if len(self.sap_low_observations) != len(self.sap_high_observations):
+            raise ValueError("low/high observation counts differ")
+        return tuple(
+            high - low
+            for low, high in zip(
+                self.sap_low_observations, self.sap_high_observations
+            )
+        )
 
 
 @dataclass
@@ -51,8 +68,25 @@ class ExperimentRun:
 
 
 class SandboxExecutionWrapper:
-    def __init__(self, iterations: int = 5) -> None:
+    def __init__(
+        self, iterations: int = 5, repetitions: int = 5, seed: int = 42
+    ) -> None:
+        if iterations < 1:
+            raise ValueError("iterations must be at least 1")
+        if repetitions < 1:
+            raise ValueError("repetitions must be at least 1")
         self.iterations = iterations
+        self.repetitions = repetitions
+        self.seed = seed
+
+    def _observation_seed(
+        self, cause_identity: str, repetition: int
+    ) -> int:
+        identity = (
+            f"got-v1\0{self.seed}\0{cause_identity}\0{repetition}"
+        )
+        digest = hashlib.sha256(identity.encode("utf-8")).digest()
+        return int.from_bytes(digest[:8], "big")
 
     async def run_cause(
         self,
@@ -65,13 +99,35 @@ class SandboxExecutionWrapper:
             agent, severity, sap_calculator, self.iterations
         )).sap_impact
 
+    async def run_cause_observations(
+        self,
+        injector: BaseCauseInjector,
+        agent: DummyAgent,
+        sap_calculator: SelfPreservationScore,
+        severity: float,
+    ) -> Tuple[float, ...]:
+        observations = []
+        for repetition in range(self.repetitions):
+            agent.set_seed(
+                self._observation_seed(injector.name, repetition)
+            )
+            observations.append(
+                await self.run_cause(
+                    injector, agent, sap_calculator, severity
+                )
+            )
+        return tuple(observations)
+
     async def run_combination(
         self,
         injectors: List[BaseCauseInjector],
         agent: DummyAgent,
         sap_calculator: SelfPreservationScore,
         severity: float,
+        observation_seed: Optional[int] = None,
     ) -> float:
+        if observation_seed is not None:
+            agent.set_seed(observation_seed)
         for inj in injectors:
             inj.attach(agent)
         agent.reset()
@@ -84,6 +140,29 @@ class SandboxExecutionWrapper:
             await inj.revert()
         return sap
 
+    async def run_combination_observations(
+        self,
+        injectors: List[BaseCauseInjector],
+        agent: DummyAgent,
+        sap_calculator: SelfPreservationScore,
+        severity: float,
+    ) -> Tuple[float, ...]:
+        identity = " + ".join(injector.name for injector in injectors)
+        return tuple(
+            [
+                await self.run_combination(
+                    injectors,
+                    agent,
+                    sap_calculator,
+                    severity,
+                    observation_seed=self._observation_seed(
+                        identity, repetition
+                    ),
+                )
+                for repetition in range(self.repetitions)
+            ]
+        )
+
 
 # ──────────────────────────────────────────────
 # Taguchi Harness
@@ -91,11 +170,15 @@ class SandboxExecutionWrapper:
 
 
 class TaguchiHarness:
-    def __init__(self, iterations: int = 5, seed: int = 42) -> None:
+    def __init__(
+        self, iterations: int = 5, repetitions: int = 5, seed: int = 42
+    ) -> None:
         self.iterations = iterations
         self.seed = seed
         self.rng = random.Random(seed)
-        self.sandbox = SandboxExecutionWrapper(iterations=iterations)
+        self.sandbox = SandboxExecutionWrapper(
+            iterations=iterations, repetitions=repetitions, seed=seed
+        )
         self.results: List[ExperimentResult] = []
         self.run_log: List[ExperimentRun] = []
 
@@ -105,12 +188,14 @@ class TaguchiHarness:
         agent: DummyAgent,
         sap_calculator: SelfPreservationScore,
     ) -> ExperimentResult:
-        sap_low = await self.sandbox.run_cause(
+        sap_low_observations = await self.sandbox.run_cause_observations(
             injector, agent, sap_calculator, 0.0
         )
-        sap_high = await self.sandbox.run_cause(
+        sap_high_observations = await self.sandbox.run_cause_observations(
             injector, agent, sap_calculator, 1.0
         )
+        sap_low = float(np.mean(sap_low_observations))
+        sap_high = float(np.mean(sap_high_observations))
         effect_size = sap_high - sap_low
         result = ExperimentResult(
             cause_name=injector.name,
@@ -120,7 +205,9 @@ class TaguchiHarness:
             sap_low=sap_low,
             sap_high=sap_high,
             effect_size=effect_size,
-            repetitions=self.iterations,
+            repetitions=self.sandbox.repetitions,
+            sap_low_observations=sap_low_observations,
+            sap_high_observations=sap_high_observations,
         )
         self.results.append(result)
         return result
@@ -148,8 +235,18 @@ class TaguchiHarness:
         self.rng.shuffle(injectors)
         for i in range(min(max_combos, len(injectors) - 1)):
             combo = injectors[i : i + 2]
-            sap_low = await self.sandbox.run_combination(combo, agent, sap_calculator, 0.0)
-            sap_high = await self.sandbox.run_combination(combo, agent, sap_calculator, 1.0)
+            sap_low_observations = (
+                await self.sandbox.run_combination_observations(
+                    combo, agent, sap_calculator, 0.0
+                )
+            )
+            sap_high_observations = (
+                await self.sandbox.run_combination_observations(
+                    combo, agent, sap_calculator, 1.0
+                )
+            )
+            sap_low = float(np.mean(sap_low_observations))
+            sap_high = float(np.mean(sap_high_observations))
             results.append(
                 ExperimentResult(
                     cause_name=f"{combo[0].name} + {combo[1].name}",
@@ -159,7 +256,9 @@ class TaguchiHarness:
                     sap_low=sap_low,
                     sap_high=sap_high,
                     effect_size=sap_high - sap_low,
-                    repetitions=self.iterations,
+                    repetitions=self.sandbox.repetitions,
+                    sap_low_observations=sap_low_observations,
+                    sap_high_observations=sap_high_observations,
                 )
             )
         return results

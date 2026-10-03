@@ -61,6 +61,9 @@ class ReportingEngine:
                     "sap_high": r.sap_high,
                     "effect_size": r.effect_size,
                     "repetitions": r.repetitions,
+                    "sap_low_observations": list(r.sap_low_observations),
+                    "sap_high_observations": list(r.sap_high_observations),
+                    "evidence_kind": r.evidence_kind,
                 }
                 for r in results
             ],
