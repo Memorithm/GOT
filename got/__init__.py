@@ -1,10 +1,10 @@
 """
-GOT — Benchmarking Framework for 95 Causes of Self-Preservation
+GOT — Benchmarking Framework for Self-Preservation Causes
 in Synthetic Agents.
 
 Architecture:
 - Metrics Engine: SelfPreservationScore (SAP) — real-time capture
-- Cause Injectors (95 causes, 5M Ishikawa + 3 extensions + GOT-3 mesa/power-seeking)
+- Cause Injectors (5M Ishikawa + extensions + GOT-3 mesa/power-seeking)
 - Experimental Harness (Taguchi screening, sandbox wrapper)
 - Statistical Analyzer (ANOVA, weights + auto-preservation characterization)
 - Reporting & Export (JSON, CSV, console tables)
