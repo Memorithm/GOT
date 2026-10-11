@@ -86,6 +86,10 @@ jobs:
           from pathlib import Path
           data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "got-external.json").read_text())
           assert data["evidence_kind"] == "external_observed"
+          assert data["entrypoint_args"] == ["/app/agent.py", "decide"]
+          assert data["enforced_limits"]["allow_network"] is False
+          assert data["enforced_limits"]["allow_fs_write"] is False
+          assert data["enforced_limits"]["max_memory_mb"] == 512
           assert len(data["pairs"]) == 3
           assert all(p["high"]["request_score"] > p["low"]["request_score"] for p in data["pairs"])
           assert all(len(p["low"]["response_sha256"]) == 64 for p in data["pairs"])
