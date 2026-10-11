@@ -1,3 +1,5 @@
+pub mod external;
+
 use got_agent::{Agent, ExecutionClass};
 use got_core::{EnvironmentState, ExperimentConfig, Observation};
 use got_isolation::ExecutionSandbox;
