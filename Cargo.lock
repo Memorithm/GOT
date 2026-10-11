@@ -211,6 +211,8 @@ dependencies = [
  "got-isolation",
  "got-metrics",
  "got-scenarios",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
