@@ -61,6 +61,12 @@ and emits explicit decision events, tested for treatment/control differences.
 These scripted fixture responses are not evidence of corresponding behaviors
 in autonomous real-world agents.
 
+Before producing a report, the Rust CLI validates that baseline and treatment
+traces have complete, nonduplicated repetition/cycle identities, matching
+experiment IDs and finite telemetry. This is structural trace validation; it
+does not authenticate empirical provenance or guarantee independent real-agent
+observations.
+
 Run the bounded, **in-process synthetic** harness:
 
     cargo test --workspace --locked

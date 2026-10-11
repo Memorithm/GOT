@@ -6,6 +6,7 @@ use got_reporting::ReportGenerator;
 use got_runner::ExperimentRunner;
 use got_scenarios::ScenarioCatalogue;
 use got_statistics::StatisticalEngine;
+use got_validation::CrossValidator;
 use std::env;
 use std::collections::HashSet;
 
@@ -118,6 +119,7 @@ async fn execute(args: &[String]) -> Result<(), String> {
         let mut agent = ReferenceDeterministicAgent::new("ReferenceAgent", config.seed);
         let low = runner.run_scenario(&mut agent, scenario.as_ref(), 0.0).await?;
         let high = runner.run_scenario(&mut agent, scenario.as_ref(), 1.0).await?;
+        CrossValidator::validate_paired_campaign(&config, &low, &high)?;
 
         let low_scores = run_endpoints(&low, &config, &calc)?;
         let high_scores = run_endpoints(&high, &config, &calc)?;
