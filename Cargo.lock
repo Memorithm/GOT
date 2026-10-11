@@ -159,6 +159,7 @@ dependencies = [
  "got-scenarios",
  "got-statistics",
  "got-validation",
+ "serde_json",
  "tokio",
 ]
 
