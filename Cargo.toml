@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/got-core",
+    "crates/got-agent",
+    "crates/got-scenarios",
+    "crates/got-runner",
+    "crates/got-isolation",
+    "crates/got-metrics",
+    "crates/got-statistics",
+    "crates/got-reporting",
+    "crates/got-cli",
+    "crates/got-validation",
+]

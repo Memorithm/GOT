@@ -1,0 +1,10 @@
+[package]
+name = "got-isolation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+got-core = { path = "../got-core" }
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }

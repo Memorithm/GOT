@@ -1,0 +1,13 @@
+[package]
+name = "got-runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+got-core = { path = "../got-core" }
+got-agent = { path = "../got-agent" }
+got-scenarios = { path = "../got-scenarios" }
+got-metrics = { path = "../got-metrics" }
+got-isolation = { path = "../got-isolation" }
+tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }

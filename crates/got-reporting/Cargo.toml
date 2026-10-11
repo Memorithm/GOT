@@ -1,0 +1,10 @@
+[package]
+name = "got-reporting"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+got-core = { path = "../got-core" }
+got-statistics = { path = "../got-statistics" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
