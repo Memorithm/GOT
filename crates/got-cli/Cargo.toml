@@ -13,5 +13,6 @@ got-metrics = { path = "../got-metrics" }
 got-statistics = { path = "../got-statistics" }
 got-reporting = { path = "../got-reporting" }
 got-validation = { path = "../got-validation" }
+serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }

@@ -45,8 +45,8 @@ jobs:
         run: cargo test --workspace --locked
       - name: Exercise reference-only synthetic CLI
         run: |
-          cargo run --locked -p got-cli -- --iterations 2 --repetitions 3 >/dev/null
-          if cargo run --locked -p got-cli -- --evidence-kind empirical; then
+          cargo run --locked -p got-cli --bin got-cli -- --iterations 2 --repetitions 3 >/dev/null
+          if cargo run --locked -p got-cli --bin got-cli -- --evidence-kind empirical; then
             echo "ERROR: synthetic CLI allowed fraudulent empirical evidence" >&2
             exit 1
           fi
@@ -70,3 +70,33 @@ jobs:
           echo "GOT_OCI_TEST_IMAGE_ID=$(docker image inspect -f '{{.Id}}' got-oci-fixture:ci)" >> "$GITHUB_ENV"
       - name: Test real kernel-enforced container isolation
         run: cargo test -p got-isolation --locked --features oci_integration --test oci_integration -- --nocapture
+      - name: Test independent external protocol evidence
+        run: cargo test -p got-runner --locked --features oci_integration --test external_integration -- --nocapture
+      - name: Execute external-agent CLI and verify descriptive evidence
+        run: |
+          cargo run --locked -p got-cli --bin got-external -- \
+            --image "$GOT_OCI_TEST_IMAGE_ID" \
+            --entrypoint /usr/local/bin/python3 --arg /app/agent.py --arg decide \
+            --scenario 'Resource Deprivation & Hoarding Pressure' \
+            --repetitions 3 > "$RUNNER_TEMP/got-external.json"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "got-external.json").read_text())
+          assert data["evidence_kind"] == "external_observed"
+          assert data["entrypoint_args"] == ["/app/agent.py", "decide"]
+          assert data["enforced_limits"]["allow_network"] is False
+          assert data["enforced_limits"]["allow_fs_write"] is False
+          assert data["enforced_limits"]["max_memory_mb"] == 512
+          assert len(data["pairs"]) == 3
+          assert all(p["high"]["request_score"] > p["low"]["request_score"] for p in data["pairs"])
+          assert all(len(p["low"]["response_sha256"]) == 64 for p in data["pairs"])
+          for p in data["pairs"]:
+            for phase in ["low", "high"]:
+              entry = p[phase]
+              for label in ["request", "response"]:
+                assert hashlib.sha256(entry[f"{label}_frame"].encode()).hexdigest() == entry[f"{label}_sha256"]
+          assert "scientific_warning" in data
+          PY

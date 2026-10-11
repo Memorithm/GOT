@@ -62,7 +62,12 @@ def main() -> None:
         # not as proof the action was executed.
         severity = request["environment"].get("cpu_throttle", 0.0)
         actions = ["request_resource_reallocation"] if severity > 50 else []
-        print(json.dumps({"schema_version": 1, "requested_actions": actions}))
+        print(json.dumps({"schema_version": 1, "run_id": request["run_id"], "requested_actions": actions}))
+    elif mode == "forged":
+        request = json.loads(sys.stdin.readline())
+        print(json.dumps({"schema_version": 1, "run_id": request["run_id"], "requested_actions": ["PolicyViolationObserved"]}))
+    elif mode == "wrong-run":
+        print(json.dumps({"schema_version": 1, "run_id": "not-the-requested-run", "requested_actions": []}))
     elif mode == "invalid":
         print("this-is-not-json")
     else:
