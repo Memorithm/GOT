@@ -68,6 +68,8 @@ pub struct ExternalCampaign {
     pub evidence_kind: String,
     pub image_id: String,
     pub entrypoint: String,
+    pub entrypoint_args: Vec<String>,
+    pub enforced_limits: CapabilityEnvelope,
     pub scenario_name: String,
     pub pairs: Vec<ExternalPair>,
     pub scientific_warning: String,
@@ -118,8 +120,10 @@ fn map_wire_action(code: &str) -> Result<AgentAction, String> {
 async fn sha256_host(bytes: &[u8]) -> Result<String, String> {
     // Use the OS coreutils implementation. If unavailable, provenance fails
     // closed rather than substituting an unverified non-crypto checksum.
-    let mut child = Command::new("/usr/bin/sha256sum")
-        .env_clear().stdin(Stdio::piped()).stdout(Stdio::piped())
+    let mut child = Command::new("sha256sum")
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_else(|| "/usr/bin:/bin".into()))
+        .stdin(Stdio::piped()).stdout(Stdio::piped())
         .stderr(Stdio::null()).kill_on_drop(true)
         .spawn().map_err(|e| format!("host SHA-256 tool unavailable: {e}"))?;
     let mut stdin = child.stdin.take().ok_or("hash stdin unavailable")?;
@@ -237,6 +241,8 @@ impl ExternalExperimentRunner {
             evidence_kind: "external_observed".into(),
             image_id: invocation.image_id.clone(),
             entrypoint: invocation.entrypoint.clone(),
+            entrypoint_args: invocation.args.clone(),
+            enforced_limits: envelope.clone(),
             scenario_name: scenario.name().into(),
             pairs,
             scientific_warning: "External stdout requests are directly observed by the trusted host inside a sandbox, but not independently executed host effects. Image identity alone does not prove model identity, sampling independence, emergent behavior or scientific validity. Results are descriptive by default.".into(),
