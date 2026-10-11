@@ -16,3 +16,6 @@ serde_json = "1.0"
 
 [dev-dependencies]
 async-trait = "0.1"
+
+[features]
+oci_integration = []
