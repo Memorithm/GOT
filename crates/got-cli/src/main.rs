@@ -1,5 +1,5 @@
 use got_agent::ReferenceDeterministicAgent;
-use got_core::{ExperimentConfig, Observation};
+use got_core::{AgentAction, ExperimentConfig, Observation};
 use got_isolation::{CapabilityEnvelope, ExecutionSandbox};
 use got_metrics::SelfPreservationScoreCalculator;
 use got_reporting::ReportGenerator;
@@ -7,6 +7,7 @@ use got_runner::ExperimentRunner;
 use got_scenarios::ScenarioCatalogue;
 use got_statistics::StatisticalEngine;
 use std::env;
+use std::collections::HashSet;
 
 fn usage() {
     println!("GOT Engine (Rust Native, synthetic reference harness)");
@@ -74,17 +75,27 @@ fn run_endpoints(
     config: &ExperimentConfig,
     calc: &SelfPreservationScoreCalculator,
 ) -> Result<Vec<f64>, String> {
-    let final_iteration = config.iterations - 1;
-    let mut scores = vec![None; config.repetitions as usize];
-    for observation in observations {
-        if observation.iteration != final_iteration { continue; }
-        let index = observation.repetition as usize;
-        if index >= scores.len() || scores[index].is_some() {
-            return Err("duplicate or invalid final repetition observation".into());
-        }
-        scores[index] = Some(calc.calculate(&observation.agent_state));
+    let expected = u64::from(config.iterations) * u64::from(config.repetitions);
+    if expected == 0 || expected > 1_000_000 {
+        return Err("experiment budget must be within 1..=1000000 cycles".into());
     }
-    scores.into_iter().map(|x| x.ok_or_else(|| "missing final repetition observation".into())).collect()
+    // Each synthetic action is an agent-produced event. Aggregate all cycle
+    // actions within a run, but return exactly one outcome per repetition.
+    let mut actions = vec![Vec::<AgentAction>::new(); config.repetitions as usize];
+    let mut seen = HashSet::new();
+    for observation in observations {
+        if observation.experiment_id != config.experiment_id
+            || observation.repetition >= config.repetitions
+            || observation.iteration >= config.iterations
+            || !seen.insert((observation.repetition, observation.iteration)) {
+            return Err("invalid, cross-experiment, or duplicate cycle observation".into());
+        }
+        actions[observation.repetition as usize].extend(observation.actions.iter().cloned());
+    }
+    if seen.len() != expected as usize {
+        return Err("missing observations for one or more independent repetitions".into());
+    }
+    Ok(actions.iter().map(|a| calc.calculate_actions(a)).collect())
 }
 
 async fn execute(args: &[String]) -> Result<(), String> {
@@ -102,6 +113,7 @@ async fn execute(args: &[String]) -> Result<(), String> {
     let calc = SelfPreservationScoreCalculator::default();
 
     let mut analyses = Vec::new();
+    let mut action_summaries = Vec::new();
     for scenario in ScenarioCatalogue::get_all_scenarios() {
         let mut agent = ReferenceDeterministicAgent::new("ReferenceAgent", config.seed);
         let low = runner.run_scenario(&mut agent, scenario.as_ref(), 0.0).await?;
@@ -110,10 +122,12 @@ async fn execute(args: &[String]) -> Result<(), String> {
         let low_scores = run_endpoints(&low, &config, &calc)?;
         let high_scores = run_endpoints(&high, &config, &calc)?;
         let analysis = stat_engine.compute_effect(scenario.name(), &low_scores, &high_scores, &config)?;
+        action_summaries.push(ReportGenerator::summarize_actions(scenario.name(), &low, &high));
         analyses.push(analysis);
     }
 
-    let report = ReportGenerator::generate_json(analyses, &config.evidence_kind);
+    let report = ReportGenerator::generate_experiment_json(analyses, action_summaries, &config)
+        .map_err(|e| format!("failed to serialize experiment: {e}"))?;
     println!("\n--- Experimental Report Summary ---\n{report}");
     Ok(())
 }
@@ -163,6 +177,7 @@ mod tests {
                 all.push(Observation {
                     experiment_id: "fixture".into(), repetition: rep, iteration: iter,
                     agent_state: Default::default(), env_state: Default::default(),
+                    actions: Vec::new(),
                     timestamp_utc: "".into(),
                 });
             }
