@@ -111,6 +111,15 @@ impl OciSandbox {
         if !info.contains("seccomp") {
             return Err("Docker seccomp is not enabled: reject untrusted agent".into());
         }
+        // Do not rely on legacy/disabled cgroup controllers for quotas.
+        let cgroup = tokio::time::timeout(Duration::from_secs(5),
+            Command::new(DOCKER).env_clear()
+                .args(["info", "--format", "{{.CgroupVersion}}"]).output()
+        ).await.map_err(|_| "Docker cgroup preflight timed out")?
+            .map_err(|e| format!("Docker cgroup preflight failed: {e}"))?;
+        if !cgroup.status.success() || cgroup.stdout != b"2\n" {
+            return Err("OCI runner requires active cgroup-v2 quota enforcement".into());
+        }
         Ok(())
     }
 
