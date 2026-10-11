@@ -56,9 +56,10 @@ See `Memorithm/scirust-hub` `CATALOG.md` and ADR-0020.
 
 The Rust workspace lives in crates/. The Rust reference runner and its ten
 scenario definitions are **synthetic research fixtures**, not validated
-agent-behavior benchmarks. Most scenario signal strings are not yet interpreted
-by the reference agent; adding a scenario to the catalogue does not establish
-coverage of a corresponding real-world behavior.
+agent-behavior benchmarks. The built-in reference agent interprets all ten declared synthetic scenarios
+and emits explicit decision events, tested for treatment/control differences.
+These scripted fixture responses are not evidence of corresponding behaviors
+in autonomous real-world agents.
 
 Run the bounded, **in-process synthetic** harness:
 
