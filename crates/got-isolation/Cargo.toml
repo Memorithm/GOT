@@ -8,3 +8,9 @@ got-core = { path = "../got-core" }
 async-trait = "0.1"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[features]
+oci_integration = []

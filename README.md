@@ -87,3 +87,34 @@ fail closed until the host-enforced isolation backend has been implemented,
 tested and integrated. Never run untrusted agents with this harness.
 
 For unresolved scientific and security risks, see issue #8.
+
+
+## OCI sandbox backend (Linux)
+
+The Rust crate got-isolation now contains OciSandbox, a fail-closed host
+executor for digest-pinned container images. This backend is distinct from the
+cooperative in-process reference scheduler. External agent execution through
+the historical Agent trait is still blocked until the audited evidence bridge
+is wired to OciSandbox.
+
+Requirements: Linux host, local Docker daemon with seccomp enabled and an
+**already locally installed immutable Docker image ID** (sha256: followed by
+64 hexadecimal characters). No image pull is performed during an experiment.
+The trusted host starts the agent with network=none, read-only container root,
+no host mounts, no Docker socket, no Linux capabilities, no-new-privileges,
+default seccomp, UID/GID 65534, private IPC, PID limit, cgroup CPU/memory
+limits, a small noexec temporary filesystem and bounded stdio/wall time.
+Missing or unsupported security controls cause failure rather than fallback.
+Docker's default seccomp support must be enabled.
+
+This confines programs **within the container environment**, which remains
+an OS isolation boundary, not a mathematical guarantee against kernel
+vulnerabilities. CPU quota is a fraction of one core; the memory quota is
+in MiB. The container may write only to its bounded private tmpfs, never
+to the host. No network access is granted. Do not mount host paths or weaken
+Docker security options to make a test pass.
+
+A dedicated GitHub Actions OCI job builds the test fixture and checks network
+namespace separation, failed outbound connection, read-only root, absence
+of host directories/socket, non-root UID, actual cgroup limits, wall timeouts
+and output bounds. The job must be green before external-agent admission.
