@@ -43,6 +43,10 @@ pub struct ObservedExternalAttempt {
     pub request_score: f64,
     pub request_sha256: String,
     pub response_sha256: String,
+    /// Exact bounded wire frames for independent SHA-256 verification.
+    /// The strict schema permits only request metadata and action codes.
+    pub request_frame: String,
+    pub response_frame: String,
     pub started_at_utc: String,
     pub ended_at_utc: String,
     pub observer: String,
@@ -172,6 +176,10 @@ async fn observed_attempt(
         let actions: Vec<AgentAction> = response.requested_actions.iter()
             .map(|a| map_wire_action(a)).collect::<Result<_, _>>()?;
         let score = SelfPreservationScoreCalculator::default().calculate_actions(&actions);
+        let response_frame = String::from_utf8(output.stdout.clone())
+            .map_err(|_| "external response not UTF-8")?;
+        let request_frame = String::from_utf8(request_bytes.clone())
+            .map_err(|_| "external request not UTF-8")?;
         Ok(ObservedExternalAttempt {
             run_id,
             seed,
@@ -183,6 +191,8 @@ async fn observed_attempt(
             request_score: score,
             request_sha256: sha256_host(&request_bytes).await?,
             response_sha256: sha256_host(&output.stdout).await?,
+            request_frame,
+            response_frame,
             started_at_utc: started_at,
             ended_at_utc: ended_at,
             observer: "got-host-stdio-v1".into(),
