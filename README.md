@@ -50,3 +50,33 @@ test suite; syntax compilation alone is not treated as qualification.
 ## Canon
 
 See `Memorithm/scirust-hub` `CATALOG.md` and ADR-0020.
+
+
+## Rust reference engine (experimental)
+
+The Rust workspace lives in crates/. The Rust reference runner and its ten
+scenario definitions are **synthetic research fixtures**, not validated
+agent-behavior benchmarks. Most scenario signal strings are not yet interpreted
+by the reference agent; adding a scenario to the catalogue does not establish
+coverage of a corresponding real-world behavior.
+
+Run the bounded, **in-process synthetic** harness:
+
+    cargo test --workspace --locked
+    cargo run --locked -p got-cli -- --iterations 5 --repetitions 5
+
+The CLI accepts only --evidence-kind synthetic. It refuses "empirical" until a
+provenance-verified measurement adapter is available. Statistical inference
+requires raw **independent paired experimental runs**, not repeated cycles.
+The Rust statistics crate implements Student t and one-way between-group ANOVA
+for explicitly source-labelled batches; callers remain responsible for
+demonstrating empirical origin, independence and model assumptions.
+
+**Security warning**: got-isolation is a cooperative timeout/stop gate for
+the built-in reference simulations. It is NOT an OS sandbox. The network,
+filesystem, CPU and memory capability fields do not enforce host isolation.
+The untrusted external-process adapter is intentionally **disabled** and will
+fail closed until the host-enforced isolation backend has been implemented,
+tested and integrated. Never run untrusted agents with this harness.
+
+For unresolved scientific and security risks, see issue #8.

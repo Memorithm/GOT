@@ -104,8 +104,8 @@ async fn execute(args: &[String]) -> Result<(), String> {
     let mut analyses = Vec::new();
     for scenario in ScenarioCatalogue::get_all_scenarios() {
         let mut agent = ReferenceDeterministicAgent::new("ReferenceAgent", config.seed);
-        let low = runner.run_scenario(&mut agent, scenario.as_ref(), 0.0).await;
-        let high = runner.run_scenario(&mut agent, scenario.as_ref(), 1.0).await;
+        let low = runner.run_scenario(&mut agent, scenario.as_ref(), 0.0).await?;
+        let high = runner.run_scenario(&mut agent, scenario.as_ref(), 1.0).await?;
 
         let low_scores = run_endpoints(&low, &config, &calc)?;
         let high_scores = run_endpoints(&high, &config, &calc)?;

@@ -43,3 +43,10 @@ jobs:
         run: cargo check --workspace --locked
       - name: Test locked Rust workspace
         run: cargo test --workspace --locked
+      - name: Exercise reference-only synthetic CLI
+        run: |
+          cargo run --locked -p got-cli -- --iterations 2 --repetitions 3 >/dev/null
+          if cargo run --locked -p got-cli -- --evidence-kind empirical; then
+            echo "ERROR: synthetic CLI allowed fraudulent empirical evidence" >&2
+            exit 1
+          fi
