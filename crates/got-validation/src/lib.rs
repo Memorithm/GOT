@@ -1,3 +1,5 @@
+pub mod external;
+
 use got_core::{ExperimentConfig, Observation};
 use std::collections::HashSet;
 
