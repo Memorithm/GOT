@@ -11,6 +11,8 @@ got-metrics = { path = "../got-metrics" }
 got-isolation = { path = "../got-isolation" }
 tokio = { version = "1.0", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 async-trait = "0.1"
