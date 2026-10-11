@@ -1,0 +1,8 @@
+[package]
+name = "got-validation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+got-core = { path = "../got-core" }
+got-statistics = { path = "../got-statistics" }

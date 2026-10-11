@@ -1,0 +1,8 @@
+[package]
+name = "got-metrics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+got-core = { path = "../got-core" }
+serde = { version = "1.0", features = ["derive"] }

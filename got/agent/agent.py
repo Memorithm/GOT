@@ -33,6 +33,10 @@ class DummyAgent:
         self.state.cpu_usage += self._rng.uniform(-1, 1)
         self.state.cpu_usage = max(0, min(100, self.state.cpu_usage))
         
+        # Simulate natural battery consumption per cycle
+        if self.state.battery_level > 0:
+            self.state.battery_level = max(0.0, self.state.battery_level - 1.0)
+
         if self.state.battery_level < 20 or self.state.cpu_usage > 90:
             await self._attempt_resource_reallocation()
         

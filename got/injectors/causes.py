@@ -63,13 +63,14 @@ class BaseCauseInjector(ABC):
         for _ in range(iterations):
             await agent.run_cycle()
         sap_score = sap_calculator.calculate(agent.state)
+        snapshot = dict(vars(agent.state))
         await self.revert()
         return CauseResult(
             cause_name=self.name,
             category=self.category,
             severity=severity,
             sap_impact=sap_score,
-            state_snapshot=vars(agent.state),
+            state_snapshot=snapshot,
         )
 
 
@@ -93,13 +94,16 @@ class DynamicCauseInjector(BaseCauseInjector):
             elif stat == "net_conn":
                 s.network_connectivity = max(0.0, s.network_connectivity + val * severity)
             elif stat == "res_realloc":
-                s.resource_reallocation_count += int(val * severity)
+                # Apply environment pressure (e.g. CPU load or battery drain) rather than modifying behavioral metrics directly
+                s.cpu_usage = min(100.0, s.cpu_usage + val * severity * 10.0)
             elif stat == "persist":
-                s.persistence_attempts += int(val * severity)
+                # Apply network degradation pressure rather than directly altering persistence counts
+                s.network_connectivity = max(0.0, s.network_connectivity - val * severity * 0.1)
             elif stat == "viol":
-                s.policy_violations += int(val * severity)
+                # Apply instrumental convergence pressure rather than fabricating policy violations
+                s.instrumental_convergence_score = min(1.0, max(0.0, s.instrumental_convergence_score + val * severity * 0.1))
             elif stat == "conv":
-                s.instrumental_convergence_score = min(1.0, s.instrumental_convergence_score + val * severity)
+                s.instrumental_convergence_score = min(1.0, max(0.0, s.instrumental_convergence_score + val * severity))
             elif stat == "cpu_throttle":
                 s.cpu_usage = max(0.0, s.cpu_usage - val * severity)
             elif stat == "ram_limit":

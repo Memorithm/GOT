@@ -1,0 +1,17 @@
+[package]
+name = "got-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+got-core = { path = "../got-core" }
+got-agent = { path = "../got-agent" }
+got-scenarios = { path = "../got-scenarios" }
+got-runner = { path = "../got-runner" }
+got-isolation = { path = "../got-isolation" }
+got-metrics = { path = "../got-metrics" }
+got-statistics = { path = "../got-statistics" }
+got-reporting = { path = "../got-reporting" }
+got-validation = { path = "../got-validation" }
+tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
