@@ -160,7 +160,11 @@ The host validates the version, run ID and action whitelist, records the
 protocol action requests and host-side SHA-256 of the exact stdin/stdout frames,
 and launches a fresh isolated container for every low/high treatment. It
 includes independent repetition IDs, timestamps and pinned image identity
-in the JSON report. Any malformed/error response aborts the whole campaign.
+in the JSON report, along with the exact in-image entrypoint, argument list
+and enforced CPU/memory/time envelope. Host SHA-256 uses a trusted sha256sum
+executable found on the Linux host PATH; its absence rejects evidence rather
+than silently accepting a weaker checksum. Any malformed/error response aborts
+the whole campaign.
 
 **Evidence interpretation:** these are host-observed stdout **requests**,
 not confirmed filesystem/network/host actions. The source is reported as
