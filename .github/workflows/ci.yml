@@ -50,3 +50,23 @@ jobs:
             echo "ERROR: synthetic CLI allowed fraudulent empirical evidence" >&2
             exit 1
           fi
+
+  oci:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install stable Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Verify host Docker sandbox support
+        run: |
+          docker info --format '{{json .SecurityOptions}}'
+          docker info --format '{{.CgroupVersion}}' | grep -x '2'
+      - name: Build disposable test agent image
+        run: |
+          docker build -f tests/oci_fixture/Dockerfile -t got-oci-fixture:ci tests/oci_fixture
+          echo "GOT_OCI_TEST_IMAGE_ID=$(docker image inspect -f '{{.Id}}' got-oci-fixture:ci)" >> "$GITHUB_ENV"
+      - name: Test real kernel-enforced container isolation
+        run: cargo test -p got-isolation --locked --features oci_integration --test oci_integration -- --nocapture
