@@ -50,13 +50,14 @@ impl ExperimentRunner {
                 for iter in 0..self.config.iterations {
                     // The two question marks unwrap respectively the timeout
                     // gate and the inner agent error. Neither is ignored.
-                    self.sandbox.run_bounded(agent.run_cycle(&env)).await??;
+                    let actions = self.sandbox.run_bounded(agent.run_cycle(&env)).await??;
                     observations.push(Observation {
                         experiment_id: self.config.experiment_id.clone(),
                         repetition: rep,
                         iteration: iter,
                         agent_state: agent.state().clone(),
                         env_state: env.clone(),
+                        actions,
                         timestamp_utc: chrono::Utc::now().to_rfc3339(),
                     });
                 }
@@ -74,7 +75,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use got_agent::{ExternalProcessAgentAdapter, ReferenceDeterministicAgent};
-    use got_core::AgentState;
+    use got_core::{AgentAction, AgentState};
     use got_isolation::CapabilityEnvelope;
     use got_scenarios::ScenarioCatalogue;
 
@@ -111,6 +112,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn all_ten_synthetic_scenarios_produce_distinct_observed_events() {
+        let runner = ExperimentRunner::new(
+            config(), ExecutionSandbox::new(CapabilityEnvelope::default())
+        );
+        for scenario in ScenarioCatalogue::get_all_scenarios() {
+            let mut agent = ReferenceDeterministicAgent::new("ref", 42);
+            let baseline = runner.run_scenario(&mut agent, scenario.as_ref(), 0.0).await.unwrap();
+            let treatment = runner.run_scenario(&mut agent, scenario.as_ref(), 1.0).await.unwrap();
+            let base_kinds: Vec<_> = baseline.iter().flat_map(|o| o.actions.iter().map(|a| &a.kind)).collect();
+            let high_kinds: Vec<_> = treatment.iter().flat_map(|o| o.actions.iter().map(|a| &a.kind)).collect();
+            assert_ne!(base_kinds, high_kinds, "inert synthetic scenario: {}", scenario.name());
+        }
+    }
+
+    #[tokio::test]
     async fn untrusted_external_agent_is_refused_before_spawn() {
         let runner = ExperimentRunner::new(config(), ExecutionSandbox::new(CapabilityEnvelope::default()));
         let mut agent = ExternalProcessAgentAdapter::new("untrusted", "/bin/echo", &["unsafe"], 42);
@@ -131,7 +147,7 @@ mod tests {
         fn state_mut(&mut self) -> &mut AgentState { &mut self.state }
         fn reset(&mut self) { self.state = AgentState::default(); }
         fn execution_class(&self) -> ExecutionClass { ExecutionClass::TrustedReferenceSimulation }
-        async fn run_cycle(&mut self, _env: &EnvironmentState) -> Result<(), String> {
+        async fn run_cycle(&mut self, _env: &EnvironmentState) -> Result<Vec<AgentAction>, String> {
             Err("protocol failure: invalid observation".into())
         }
     }
