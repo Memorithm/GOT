@@ -29,3 +29,17 @@ jobs:
           python -m got --help
       - name: Functional tests
         run: python -m unittest discover -s tests -v
+
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install stable Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Check locked Rust workspace
+        run: cargo check --workspace --locked
+      - name: Test locked Rust workspace
+        run: cargo test --workspace --locked
