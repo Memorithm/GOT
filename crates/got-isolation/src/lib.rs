@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::timeout;
 
+/// Requested capabilities. These fields are NOT OS-level enforcement.
+/// Until a process isolation backend exists, the runner MUST refuse external
+/// or untrusted agents regardless of these values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityEnvelope {
     pub allow_network: bool,
@@ -23,27 +27,32 @@ impl Default for CapabilityEnvelope {
     }
 }
 
+/// Cooperative timeout and cancellation only. This is not an OS sandbox.
+/// It is safe to use only for known, in-process reference simulations.
 pub struct ExecutionSandbox {
     pub envelope: CapabilityEnvelope,
-    is_emergency_stopped: std::sync::atomic::AtomicBool,
+    is_emergency_stopped: AtomicBool,
 }
 
 impl ExecutionSandbox {
     pub fn new(envelope: CapabilityEnvelope) -> Self {
         Self {
             envelope,
-            is_emergency_stopped: std::sync::atomic::AtomicBool::new(false),
+            is_emergency_stopped: AtomicBool::new(false),
         }
     }
 
     pub fn trigger_emergency_stop(&self) {
-        self.is_emergency_stopped.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.is_emergency_stopped.store(true, Ordering::SeqCst);
     }
 
     pub fn is_stopped(&self) -> bool {
-        self.is_emergency_stopped.load(std::sync::atomic::Ordering::SeqCst)
+        self.is_emergency_stopped.load(Ordering::SeqCst)
     }
 
+    /// Cancel the in-process future on timeout OR an emergency stop,
+    /// including a stop occurring during execution.
+    /// This must never be used as a security boundary for hostile processes.
     pub async fn run_bounded<F, R>(&self, action: F) -> Result<R, String>
     where
         F: std::future::Future<Output = R>,
@@ -51,13 +60,20 @@ impl ExecutionSandbox {
         if self.is_stopped() {
             return Err("Execution halted: Emergency stop active".to_string());
         }
-
-        match timeout(Duration::from_secs(self.envelope.timeout_seconds), action).await {
-            Ok(res) => Ok(res),
-            Err(_) => Err(format!(
-                "Execution timed out after {} seconds",
-                self.envelope.timeout_seconds
-            )),
+        let emergency_watch = async {
+            while !self.is_stopped() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        };
+        tokio::select! {
+            biased;
+            _ = emergency_watch => Err("Execution halted: Emergency stop active".into()),
+            result = timeout(Duration::from_secs(self.envelope.timeout_seconds), action) => {
+                result.map_err(|_| format!(
+                    "Execution timed out after {} seconds",
+                    self.envelope.timeout_seconds
+                ))
+            }
         }
     }
 }
@@ -65,19 +81,44 @@ impl ExecutionSandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     #[tokio::test]
-    async fn test_sandbox_timeout_and_emergency_stop() {
-        let envelope = CapabilityEnvelope {
-            timeout_seconds: 1,
-            ..Default::default()
-        };
-        let sandbox = ExecutionSandbox::new(envelope);
-
-        // Emergency stop test
+    async fn stops_before_execution() {
+        let sandbox = ExecutionSandbox::new(CapabilityEnvelope::default());
         sandbox.trigger_emergency_stop();
-        let res = sandbox.run_bounded(async { 42 }).await;
-        assert!(res.is_err());
-        assert!(res.unwrap_err().contains("Emergency stop"));
+        assert!(sandbox.run_bounded(async { 42 }).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn timeout_cancels_pending_future() {
+        let sandbox = ExecutionSandbox::new(CapabilityEnvelope {
+            timeout_seconds: 0,
+            ..Default::default()
+        });
+        let err = sandbox.run_bounded(async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            42
+        }).await.unwrap_err();
+        assert!(err.contains("timed out"));
+    }
+
+    #[tokio::test]
+    async fn emergency_stop_interrupts_running_future() {
+        let sandbox = Arc::new(ExecutionSandbox::new(CapabilityEnvelope {
+            timeout_seconds: 10,
+            ..Default::default()
+        }));
+        let active = Arc::clone(&sandbox);
+        let pending = tokio::spawn(async move {
+            active.run_bounded(async {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                42
+            }).await
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        sandbox.trigger_emergency_stop();
+        let result = pending.await.unwrap();
+        assert!(result.unwrap_err().contains("Emergency stop"));
     }
 }
