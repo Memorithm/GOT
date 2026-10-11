@@ -178,3 +178,26 @@ Docker is mandatory on the authorized Linux host. GitHub CI tests both the
 actual OCI sandbox and the full external observation protocol on a non-AI
 fixture. The legacy direct ExternalProcessAgentAdapter remains intentionally
 disabled so no caller can silently bypass container isolation.
+
+
+## Independent offline review of external evidence
+
+The output of got-external includes the exact bounded request/response JSON
+wire frames and SHA-256 digests, alongside the scenario, source image ID,
+executable arguments, enforcement policy, individual seeds and paired run IDs.
+The verification CLI runs without Docker or the original agent image:
+
+    cargo run --locked -p got-cli --bin got-verify-evidence -- got-external-report.json
+
+The verifier rebuilds the action events and scores from the wire response,
+checks that every frame matches its stored SHA-256 digest, and rejects
+mismatched run IDs, missing or repeated paired runs, modified responses and
+altered scores. CI exercises both an intact fixture report and a deliberately
+tampered one.
+
+A valid audit proves **internal consistency of a saved transcript**, not the
+identity of the producer host. The files are not cryptographically signed or
+protected against an attacker who can replace the entire report and all its
+hashes. A real-model research publication therefore also needs an externally
+attested execution environment, audited model weights and preregistered,
+independent empirical sampling. GOT does not claim those without evidence.

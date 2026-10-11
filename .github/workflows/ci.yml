@@ -100,3 +100,24 @@ jobs:
                 assert hashlib.sha256(entry[f"{label}_frame"].encode()).hexdigest() == entry[f"{label}_sha256"]
           assert "scientific_warning" in data
           PY
+      - name: Re-audit saved evidence and reject tampered frames
+        run: |
+          cargo run --locked -p got-cli --bin got-verify-evidence -- "$RUNNER_TEMP/got-external.json" > "$RUNNER_TEMP/got-audit.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          base = Path(os.environ["RUNNER_TEMP"])
+          summary = json.loads((base / "got-audit.json").read_text())
+          assert summary["status"] == "protocol_frames_verified"
+          assert summary["unique_pairs"] == 3
+          assert summary["mean_high_minus_low_request_score"] > 0
+          assert summary["statistical_inference_qualified"] is False
+          report = json.loads((base / "got-external.json").read_text())
+          report["pairs"][0]["high"]["response_frame"] += " "
+          (base / "got-tampered.json").write_text(json.dumps(report))
+          PY
+          if cargo run --locked -p got-cli --bin got-verify-evidence -- "$RUNNER_TEMP/got-tampered.json"; then
+            echo "ERROR: independent verifier accepted tampered external frame" >&2
+            exit 1
+          fi

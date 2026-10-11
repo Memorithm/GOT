@@ -6,3 +6,8 @@ edition = "2021"
 [dependencies]
 got-core = { path = "../got-core" }
 got-statistics = { path = "../got-statistics" }
+got-runner = { path = "../got-runner" }
+got-metrics = { path = "../got-metrics" }
+got-isolation = { path = "../got-isolation" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
