@@ -178,6 +178,7 @@ dependencies = [
  "async-trait",
  "got-core",
  "serde",
+ "serde_json",
  "tokio",
 ]
 
