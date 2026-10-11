@@ -241,7 +241,12 @@ name = "got-validation"
 version = "0.1.0"
 dependencies = [
  "got-core",
+ "got-isolation",
+ "got-metrics",
+ "got-runner",
  "got-statistics",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
