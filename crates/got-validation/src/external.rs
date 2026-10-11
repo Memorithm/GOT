@@ -208,7 +208,7 @@ mod tests {
         ExternalCampaign {
             schema_version: 1, experiment_id: "audit".into(),
             evidence_kind: "external_observed".into(),
-            image_id: image,
+            image_id: image.clone(),
             entrypoint: "/usr/bin/agent".into(),
             entrypoint_args: vec![],
             enforced_limits: CapabilityEnvelope::default(),
