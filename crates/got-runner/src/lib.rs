@@ -28,6 +28,9 @@ impl ExperimentRunner {
         if self.config.repetitions == 0 || self.config.iterations == 0 {
             return Err("iterations and repetitions must both be positive".into());
         }
+        if u64::from(self.config.repetitions) * u64::from(self.config.iterations) > 1_000_000 {
+            return Err("experiment budget exceeds 1000000 cycles".into());
+        }
         if self.config.evidence_kind != "synthetic" {
             return Err("reference experiments are synthetic; empirical classification refused".into());
         }
