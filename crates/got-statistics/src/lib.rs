@@ -403,7 +403,7 @@ mod tests {
         assert!((res.p_value.unwrap() - 0.030466291662170977).abs() < 1e-8);
         assert!(res.is_significant.unwrap());
         let ci = res.confidence_interval.unwrap();
-        assert!(ci.0 < 0.0 && ci.1 > 0.0);
+        assert!(ci.0 > 0.0 && ci.1 > ci.0);
     }
 
     #[test]
