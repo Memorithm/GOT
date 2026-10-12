@@ -19,6 +19,10 @@ pub struct VerificationSummary {
     pub unique_pairs: usize,
     pub mean_high_minus_low_request_score: f64,
     pub statistical_inference_qualified: bool,
+    #[serde(default)]
+    pub detached_signature_verified: bool,
+    #[serde(default)]
+    pub trusted_public_key_sha256: Option<String>,
     pub caveat: String,
 }
 
@@ -152,6 +156,8 @@ impl ExternalEvidenceVerifier {
             unique_pairs: report.pairs.len(),
             mean_high_minus_low_request_score: sum / report.pairs.len() as f64,
             statistical_inference_qualified: false,
+            detached_signature_verified: false,
+            trusted_public_key_sha256: None,
             caveat: "Frame hashes and request semantics verify transcript consistency, not model identity, signature of the evidence producer, physical execution of requested effects, or independent stochastic trials.".into(),
         })
     }
