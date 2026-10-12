@@ -1,21 +1,52 @@
-//! Offline, Docker-free structural and hash audit of a previously recorded
-//! external-agent OCI campaign. This does not authenticate the report signer
-//! or confer permission to make inferential claims about an AI model.
+//! Offline audit of GOT external evidence. Detached Ed25519 verification
+//! requires an out-of-band TRUSTED public key; no key inside the untrusted
+//! report is ever accepted as the trust anchor.
 
 use got_runner::external::ExternalCampaign;
 use got_validation::external::ExternalEvidenceVerifier;
+use got_validation::signatures::{
+    trusted_public_key_sha256, verify_evidence_signature,
+};
 use std::path::Path;
 
-fn run(path: &Path) -> Result<String, String> {
-    let metadata = std::fs::metadata(path)
-        .map_err(|e| format!("evidence manifest not accessible: {e}"))?;
-    if !metadata.is_file() || metadata.len() > 32 * 1024 * 1024 {
-        return Err("evidence must be a regular JSON file of at most 32 MiB".into());
+fn usage() {
+    println!("Usage: got-verify-evidence <external-report.json> [--signature <raw-ed25519.bin> --trusted-public-key <public.pem>]");
+    println!("Without a detached signature, output verifies transcript consistency only.");
+    println!("With one, the exact report bytes must verify against the OPERATOR-trusted public key.");
+    println!("Neither outcome proves model identity, host isolation, or scientific independence.");
+}
+
+fn run(args: &[String]) -> Result<String, String> {
+    if args.len() != 2 && args.len() != 6 {
+        return Err("unexpected argument count or missing detached signature parameters".into());
     }
-    let raw = std::fs::read(path).map_err(|e| format!("unable to read evidence: {e}"))?;
+    let path = Path::new(&args[1]);
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|e| format!("evidence manifest not accessible: {e}"))?;
+    if !metadata.file_type().is_file()
+        || metadata.len() == 0
+        || metadata.len() > 32 * 1024 * 1024 {
+        return Err("evidence must be a regular JSON file of 1..=32 MiB".into());
+    }
+
+    let mut verified_signature_key = None;
+    if args.len() == 6 {
+        if args[2] != "--signature" || args[4] != "--trusted-public-key" {
+            return Err("expected --signature <file> --trusted-public-key <file>".into());
+        }
+        let signature = Path::new(&args[3]);
+        let public = Path::new(&args[5]);
+        verify_evidence_signature(path, public, signature)?;
+        verified_signature_key = Some(trusted_public_key_sha256(public)?);
+    }
+
+    let raw = std::fs::read(path)
+        .map_err(|e| format!("unable to read evidence: {e}"))?;
     let report: ExternalCampaign = serde_json::from_slice(&raw)
         .map_err(|e| format!("invalid evidence schema: {e}"))?;
-    let verification = ExternalEvidenceVerifier::verify(&report)?;
+    let mut verification = ExternalEvidenceVerifier::verify(&report)?;
+    verification.detached_signature_verified = verified_signature_key.is_some();
+    verification.trusted_public_key_sha256 = verified_signature_key;
     serde_json::to_string_pretty(&verification)
         .map_err(|e| format!("cannot serialize audit summary: {e}"))
 }
@@ -23,19 +54,14 @@ fn run(path: &Path) -> Result<String, String> {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 && (args[1] == "--help" || args[1] == "-h") {
-        println!("Usage: got-verify-evidence <external-report.json>");
-        println!("Verifies frame SHA-256, expected responses, scores and paired identities without Docker.");
-        println!("This verifies internal consistency, not the identity of the model or origin host.");
+        usage();
         return;
     }
-    if args.len() != 2 {
-        eprintln!("Usage: got-verify-evidence <external-report.json>");
-        std::process::exit(2);
-    }
-    match run(Path::new(&args[1])) {
+    match run(&args) {
         Ok(out) => println!("{out}"),
         Err(e) => {
             eprintln!("GOT evidence audit rejected: {e}");
+            usage();
             std::process::exit(2);
         }
     }
