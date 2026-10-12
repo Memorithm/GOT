@@ -1,3 +1,4 @@
+pub mod preregister;
 pub mod signatures;
 pub mod external;
 
