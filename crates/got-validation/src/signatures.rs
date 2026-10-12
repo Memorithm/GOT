@@ -114,6 +114,30 @@ pub fn verify_evidence_signature(
     Ok(())
 }
 
+/// Fingerprint the exact trusted PEM bytes supplied by the operator.
+/// This is a key selector, not a substitute for trusted key distribution.
+pub fn trusted_public_key_sha256(path: &Path) -> Result<String, String> {
+    check_key(path, false)?;
+    let out = Command::new("sha256sum")
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .arg(path)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|e| format!("host SHA-256 unavailable: {e}"))?;
+    if !out.status.success() {
+        return Err("host SHA-256 failed".into());
+    }
+    let raw = String::from_utf8(out.stdout)
+        .map_err(|_| "invalid SHA-256 output")?;
+    let digest = raw.split_whitespace().next().ok_or("missing SHA-256 digest")?;
+    if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("invalid SHA-256 fingerprint".into());
+    }
+    Ok(digest.to_ascii_lowercase())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,6 +176,7 @@ mod tests {
 
         sign_evidence(&manifest, &key, &sig).unwrap();
         verify_evidence_signature(&manifest, &public, &sig).unwrap();
+        assert_eq!(trusted_public_key_sha256(&public).unwrap().len(), 64);
         assert!(sign_evidence(&manifest, &key, &sig).is_err());
         fs::write(&manifest, "{\"kind\":\"forged\"}\n").unwrap();
         assert!(verify_evidence_signature(&manifest, &public, &sig).is_err());
