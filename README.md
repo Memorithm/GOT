@@ -201,3 +201,40 @@ protected against an attacker who can replace the entire report and all its
 hashes. A real-model research publication therefore also needs an externally
 attested execution environment, audited model weights and preregistered,
 independent empirical sampling. GOT does not claim those without evidence.
+
+
+## Detached signature of host evidence (Ed25519)
+
+The OCI host transcript can be authenticated using a detached Ed25519
+signature. It proves that the exact JSON manifest was signed with a key
+corresponding to the *operator-trusted* public key. The private signing key
+is provisioned separately **on the trusted RemoteOps host**, never in a
+container, source repository, workflow log or GitHub artifact.
+
+An authorized host with OpenSSL 3 can sign a completed JSON report:
+
+    cargo run --locked -p got-cli --bin got-sign-evidence -- \
+      external-report.json /secure/path/got-private.pem external-report.sig
+
+The key file must be a regular, non-symlink file with mode 0600 (or stricter),
+and no existing signature is overwritten. Signatures are raw 64-byte Ed25519.
+
+On an independent verification machine, obtain the trusted public key from
+a verified out-of-band operator channel (never from the untrusted report):
+
+    cargo run --locked -p got-cli --bin got-verify-evidence -- \
+      external-report.json \
+      --signature external-report.sig \
+      --trusted-public-key /trusted/keys/got-public.pem
+
+The verification result reports detached_signature_verified and the SHA-256
+fingerprint of the operator-supplied trusted PEM bytes. The unsigned legacy
+verification command remains usable, but explicitly reports signature=false.
+
+CI uses a disposable key generated **only for tests**. A test key is not a
+production identity and must not be reused for actual host attestation.
+A valid signature authenticates key possession and report integrity, but
+does not establish which physical machine created the file, that model
+weights match an approved identity, that an agent had a meaningful action
+or that experimental samples were scientifically independent. RemoteOps
+must separately govern key provisioning and source/host authorization.
