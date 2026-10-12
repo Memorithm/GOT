@@ -1,3 +1,4 @@
+pub mod signatures;
 pub mod external;
 
 use got_core::{ExperimentConfig, Observation};

@@ -121,3 +121,45 @@ jobs:
             echo "ERROR: independent verifier accepted tampered external frame" >&2
             exit 1
           fi
+      - name: Prove Ed25519 host signatures survive independent verification
+        run: |
+          set -euo pipefail
+          umask 077
+          openssl genpkey -algorithm Ed25519 -out "$RUNNER_TEMP/got-ci-private.pem"
+          openssl pkey -in "$RUNNER_TEMP/got-ci-private.pem" \
+            -pubout -out "$RUNNER_TEMP/got-ci-public.pem"
+          cargo run --locked -p got-cli --bin got-sign-evidence -- \
+            "$RUNNER_TEMP/got-external.json" \
+            "$RUNNER_TEMP/got-ci-private.pem" \
+            "$RUNNER_TEMP/got-ci-detached.sig"
+          cargo run --locked -p got-cli --bin got-verify-evidence -- \
+            "$RUNNER_TEMP/got-external.json" \
+            --signature "$RUNNER_TEMP/got-ci-detached.sig" \
+            --trusted-public-key "$RUNNER_TEMP/got-ci-public.pem" \
+            > "$RUNNER_TEMP/got-signed-audit.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          audit = json.loads((Path(os.environ["RUNNER_TEMP"]) / "got-signed-audit.json").read_text())
+          assert audit["detached_signature_verified"] is True
+          assert len(audit["trusted_public_key_sha256"]) == 64
+          assert audit["statistical_inference_qualified"] is False
+          PY
+          if cargo run --locked -p got-cli --bin got-verify-evidence -- \
+            "$RUNNER_TEMP/got-tampered.json" \
+            --signature "$RUNNER_TEMP/got-ci-detached.sig" \
+            --trusted-public-key "$RUNNER_TEMP/got-ci-public.pem"; then
+            echo "ERROR: tampered evidence accepted with valid detached signature" >&2
+            exit 1
+          fi
+          openssl genpkey -algorithm Ed25519 -out "$RUNNER_TEMP/got-ci-wrong.pem"
+          openssl pkey -in "$RUNNER_TEMP/got-ci-wrong.pem" \
+            -pubout -out "$RUNNER_TEMP/got-ci-wrong.pub"
+          if cargo run --locked -p got-cli --bin got-verify-evidence -- \
+            "$RUNNER_TEMP/got-external.json" \
+            --signature "$RUNNER_TEMP/got-ci-detached.sig" \
+            --trusted-public-key "$RUNNER_TEMP/got-ci-wrong.pub"; then
+            echo "ERROR: untrusted Ed25519 public key was accepted" >&2
+            exit 1
+          fi
