@@ -23,6 +23,7 @@ jobs:
       - name: Python 3.12 (uv-managed; actions/setup-python has no Debian builds)
         run: |
           set -euo pipefail
+          export UV_CACHE_DIR="$RUNNER_TEMP/uv-cache"
           python3 -m venv "$RUNNER_TEMP/uv-bootstrap"
           "$RUNNER_TEMP/uv-bootstrap/bin/pip" install --disable-pip-version-check -q uv==0.5.11
           "$RUNNER_TEMP/uv-bootstrap/bin/uv" venv --seed --python 3.12 "$RUNNER_TEMP/py312"
